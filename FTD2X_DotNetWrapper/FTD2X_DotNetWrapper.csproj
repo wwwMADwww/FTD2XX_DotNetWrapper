@@ -4,4 +4,18 @@
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(NETCoreSdkRuntimeIdentifier)'=='linux-x86'">
+    <DefineConstants>TargetOS_Linux</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(NETCoreSdkRuntimeIdentifier)'=='linux-x64'">
+    <DefineConstants>TargetOS_Linux</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(NETCoreSdkRuntimeIdentifier)'=='win-x86'">
+    <DefineConstants>TargetOS_Windows</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(NETCoreSdkRuntimeIdentifier)'=='win-x64'">
+    <DefineConstants>TargetOS_Windows</DefineConstants>
+  </PropertyGroup>
+  
+
 </Project>

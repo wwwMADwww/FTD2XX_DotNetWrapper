@@ -1,7 +1,7 @@
 /*
 ** FTD2XX_NET.cs
 **
-** Copyright © 2009-2013 Future Technology Devices International Limited
+** Copyright ï¿½ 2009-2013 Future Technology Devices International Limited
 **
 ** C# Source file for .NET wrapper of the Windows FTD2XX.dll API calls.
 ** Main module
@@ -27,7 +27,6 @@ using System.Collections.Generic;
 using System.Text;
 using System.Runtime.InteropServices;
 using System.Threading;
-// using System.Windows.Forms;
 using System.IO;
 using FTD2X_DotNetWrapper.Platform;
 
@@ -39,7 +38,16 @@ namespace FTD2XX_NET
     public class FTDI
     {
 
+        const string _libpathWindows = "FTD2XX.DLL";
+
+        // path suggested by official linux installation guide
+        const string _libpathLinux = "/usr/local/lib/libftd2xx.so";
+
+
         IPlatformFuncs _platformFuncs;
+        string _libpath;
+
+
 
         #region CONSTRUCTOR_DESTRUCTOR
         // constructor
@@ -48,54 +56,40 @@ namespace FTD2XX_NET
         /// </summary>
         public FTDI()
         {
-            InitPlatformFuncs();
-
-            // If FTD2XX.DLL is NOT loaded already, load it
-            if (hFTD2XXDLL == IntPtr.Zero)
-            {
-                // Load our FTD2XX.DLL library
-                hFTD2XXDLL = _platformFuncs.LoadLibrary(@"FTD2XX.DLL");
-                if (hFTD2XXDLL == IntPtr.Zero)
-                {
-                    // Failed to load our FTD2XX.DLL library from System32 or the application directory
-                    // Try the same directory that this FTD2XX_NET DLL is in
-                    Console.WriteLine("Attempting to load FTD2XX.DLL from:\n" + Path.GetDirectoryName(GetType().Assembly.Location));
-                    hFTD2XXDLL = _platformFuncs.LoadLibrary(@Path.GetDirectoryName(GetType().Assembly.Location) + "\\FTD2XX.DLL");
-                }
-            }
-
-            // If we have succesfully loaded the library, get the function pointers set up
-            if (hFTD2XXDLL != IntPtr.Zero)
-            {
-                FindFunctionPointers();
-            }
-            else
-            {
-                // Failed to load our DLL - alert the user
-                Console.WriteLine("Failed to load FTD2XX.DLL.  Are the FTDI drivers installed?");
-            }
+            _libpath = GetLibraryPath();
+            Init();
         }
 
         /// <summary>
         /// Non default constructor allowing passing of string for dll handle.
         /// </summary>
-        public FTDI(String path)
+        public FTDI(String libpath)
         {
+            _libpath = Path.GetFullPath(libpath);
+            Init();
+        }
+
+        void Init()
+        {
+            if (!File.Exists(_libpath))
+                throw new FileNotFoundException($"Library file not found '{_libpath}'");
+
             // If nonstandard.DLL is NOT loaded already, load it
-            if (path == "")
-                return;
 
             InitPlatformFuncs();
 
             if (hFTD2XXDLL == IntPtr.Zero)
             {
                 // Load our nonstandard.DLL library
-                hFTD2XXDLL = _platformFuncs.LoadLibrary(path);
+                hFTD2XXDLL = _platformFuncs.LoadLibrary(_libpath);
                 if (hFTD2XXDLL == IntPtr.Zero)
                 {
+                    var libfilename = Path.GetFileName(_libpath);
+                    var assemblyDir = Path.GetDirectoryName(GetType().Assembly.Location);
                     // Failed to load our PathToDll library
                     // Give up :(
-                    Console.WriteLine("Attempting to load FTD2XX.DLL from:\n" + Path.GetDirectoryName(GetType().Assembly.Location));
+                    Console.WriteLine($"Attempting to load {libfilename} from:\n" + assemblyDir);
+                    hFTD2XXDLL = _platformFuncs.LoadLibrary(Path.Combine(assemblyDir, libfilename));
                 }
             }
 
@@ -106,16 +100,22 @@ namespace FTD2XX_NET
             }
             else
             {
-                Console.WriteLine("Failed to load FTD2XX.DLL.  Are the FTDI drivers installed?");
+                Console.WriteLine("Failed to load FTD2XX library. Are the FTDI drivers installed?");
             }
         }
 
         void InitPlatformFuncs()
         {
+            _platformFuncs = new PlatformFuncs();
+            
+        }
+
+        private string GetLibraryPath()
+        {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                _platformFuncs = new WindowsFuncs();
+                return _libpathWindows;
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                _platformFuncs = new LinuxFuncs();
+                return _libpathLinux;
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 throw new NotImplementedException();
             else
@@ -6460,9 +6460,12 @@ namespace FTD2XX_NET
                     GetDeviceType(ref deviceType);
                     if ((deviceType == FT_DEVICE.FT_DEVICE_2232) | (deviceType == FT_DEVICE.FT_DEVICE_2232H) | (deviceType == FT_DEVICE.FT_DEVICE_4232H))
                     {
+                        // Console.WriteLine("InterfaceIdentifier");
                         string Description;
                         GetDescription(out Description);
-                        Identifier = Description.Substring((Description.Length - 1));
+                        Identifier = Description.Length > 0 
+                            ? Description.Substring((Description.Length - 1))
+                            : "";
                         return Identifier;
                     }
                 }
