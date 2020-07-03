@@ -2,92 +2,133 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace FTD2X_DotNetWrapper.Platform
 {
     public class PlatformFuncs: IPlatformFuncs
     {
-
-
-        #if TargetOS_Windows
-
-        #region LOAD_LIBRARIES
-        /// <summary>
-        /// Built-in Windows API functions to allow us to dynamically load our own DLL.
-        /// Will allow us to use old versions of the DLL that do not have all of these functions available.
-        /// </summary>
-        [DllImport("kernel32.dll", EntryPoint = "LoadLibrary")]
-        private static extern IntPtr LoadLibraryFunc(string dllToLoad);
-
-        [DllImport("kernel32.dll", EntryPoint = "GetProcAddress")]
-        private static extern IntPtr GetProcAddressFunc(IntPtr hModule, string procedureName);
-
-        [DllImport("kernel32.dll", EntryPoint = "FreeLibrary")]
-        private static extern bool FreeLibraryFunc(IntPtr hModule);
-        #endregion
-
-        public IntPtr LoadLibrary(string name)
-        {
-            return LoadLibraryFunc(name);
-        }
-
-        public IntPtr GetSymbol(IntPtr libraryHandle, string symbolName)
-        {
-            return GetProcAddressFunc(libraryHandle, symbolName);
-        }
-
-        public int FreeLibrary(IntPtr libraryHandle)
-        {
-            return FreeLibraryFunc(libraryHandle) ? 0 : -1;
-        }
-
-
-        #elif TargetOS_Linux
-
         // https://linux.die.net/man/3/dlopen
-
         // https://code.woboq.org/userspace/glibc/bits/dlfcn.h.html
         const int RTLD_NOW = 0x00002;
 
+        protected IntPtr _libHandle;
 
-        [DllImport("libdl.so")]
-        protected static extern IntPtr dlopen(string filename, int flags);
+        protected delegate IntPtr LoadLibraryDelegate(string libraryPath);
+        protected delegate IntPtr DlOpenDelegate(string libraryPath, int flags);
+        protected delegate IntPtr GetSymbolDelegate(IntPtr libraryHandle, string name);
+        protected delegate int FreeLibraryDelegate(IntPtr libraryHandle);
 
+        protected LoadLibraryDelegate _loadLibraryFunc;
+        protected GetSymbolDelegate _getSymbolFunc;
+        protected FreeLibraryDelegate _freeLibraryFunc;
 
-        [DllImport("libdl.so")]
-        protected static extern IntPtr dlsym(IntPtr handle, string symbol);
-
-
-        [DllImport("libdl.so")]
-        protected static extern int dlclose(IntPtr handle);
-
-        public IntPtr LoadLibrary(string name)
+        public PlatformFuncs()
         {
-            return dlopen(name, RTLD_NOW);
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                OperatingSystem = OperatingSystem.Windows;
+
+                // TryLoad ?
+                _libHandle = NativeLibrary.Load("kernel32.dll");
+
+
+                // TryGetExport
+                var loadlibp = NativeLibrary.GetExport(_libHandle, "LoadLibraryA");
+                _loadLibraryFunc = Marshal.GetDelegateForFunctionPointer<LoadLibraryDelegate>(loadlibp);
+
+                // TryGetExport
+                var getsymbolp = NativeLibrary.GetExport(_libHandle, "GetProcAddress");
+                _getSymbolFunc = Marshal.GetDelegateForFunctionPointer<GetSymbolDelegate>(getsymbolp);
+
+                // TryGetExport
+                var freelibraryp = NativeLibrary.GetExport(_libHandle, "FreeLibrary");
+                _freeLibraryFunc = Marshal.GetDelegateForFunctionPointer<FreeLibraryDelegate>(freelibraryp);
+
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                OperatingSystem = OperatingSystem.Linux;
+
+                // TryLoad ?
+                _libHandle = NativeLibrary.Load("libdl.so");
+
+
+                // TryGetExport
+                var loadlibp = NativeLibrary.GetExport(_libHandle, "dlopen");
+                var loadlibpf = Marshal.GetDelegateForFunctionPointer<DlOpenDelegate>(loadlibp);
+                _loadLibraryFunc = (path) => loadlibpf(path, RTLD_NOW);
+
+                // TryGetExport
+                var getsymbolp = NativeLibrary.GetExport(_libHandle, "dlsym");
+                _getSymbolFunc = Marshal.GetDelegateForFunctionPointer<GetSymbolDelegate>(getsymbolp);
+
+                // TryGetExport
+                var freelibraryp = NativeLibrary.GetExport(_libHandle, "dlclose");
+                _freeLibraryFunc = Marshal.GetDelegateForFunctionPointer<FreeLibraryDelegate>(freelibraryp);
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                OperatingSystem = OperatingSystem.OSX;
+                throw new NotImplementedException("Dynamic library loading on OSX is not implemented");
+            }
+            else
+            {
+                throw new NotImplementedException("Application is running on unknown operation system.");
+            }
         }
 
-        public IntPtr GetSymbol(IntPtr libraryHandle, string symbolName)
+
+        public IntPtr LoadLibrary(string name) => _loadLibraryFunc(name);
+        public IntPtr GetSymbol(IntPtr libraryHandle, string symbolName) => _getSymbolFunc(libraryHandle, symbolName);
+        public int FreeLibrary(IntPtr libraryHandle) => _freeLibraryFunc(libraryHandle);
+
+        public OperatingSystem OperatingSystem { get; protected set; }
+
+
+        #region IDisposable Support
+        private bool disposedValue = false; // To detect redundant calls
+
+
+        protected virtual void Dispose(bool disposing)
         {
-            return dlsym(libraryHandle, symbolName);
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    // TODO: dispose managed state (managed objects).
+                }
+
+                // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
+                // TODO: set large fields to null.
+
+                NativeLibrary.Free(_libHandle);
+                _libHandle = IntPtr.Zero;
+
+                _loadLibraryFunc = null;
+                _getSymbolFunc = null;
+                _freeLibraryFunc = null;
+
+                disposedValue = true;
+            }
         }
 
-        public int FreeLibrary(IntPtr libraryHandle)
+        // TODO: override a finalizer only if Dispose(bool disposing) above has code to free unmanaged resources.
+        // ~PlatformFuncs2()
+        // {
+        //   // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+        //   Dispose(false);
+        // }
+
+        // This code added to correctly implement the disposable pattern.
+        public void Dispose()
         {
-            return dlclose(libraryHandle);
+            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+            Dispose(true);
+            // TODO: uncomment the following line if the finalizer is overridden above.
+            // GC.SuppressFinalize(this);
         }
-        
-        #else
-
-        #error please check or define TargetOS_ variable in project file, build settings or commandline
-        // examples:
-        // dotnet build FTD2X_DotNetWrapper.csproj /p:DefineConstants=TargetOS_Windows
-        // dotnet build FTD2X_DotNetWrapper.csproj /p:DefineConstants=TargetOS_Linux
-
-        public IntPtr LoadLibrary(string name) => throw new NotImplementedException();
-        public IntPtr GetSymbol(IntPtr libraryHandle, string symbolName) => throw new NotImplementedException();
-        public int FreeLibrary(IntPtr libraryHandle) => throw new NotImplementedException();
-
-        #endif
+        #endregion
 
 
     }

@@ -29,18 +29,19 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.IO;
 using FTD2X_DotNetWrapper.Platform;
+using OperatingSystem = FTD2X_DotNetWrapper.Platform.OperatingSystem;
 
 namespace FTD2XX_NET
 {
     /// <summary>
     /// Class wrapper for FTD2XX.DLL
     /// </summary>
-    public class FTDI
+    public class FTDI: IDisposable
     {
 
         const string _libpathWindows = "FTD2XX.DLL";
 
-        // path suggested by official linux installation guide
+        // path suggested by official FTDI linux installation guide
         const string _libpathLinux = "/usr/local/lib/libftd2xx.so";
 
 
@@ -65,28 +66,23 @@ namespace FTD2XX_NET
         /// </summary>
         public FTDI(String libpath)
         {
-            _libpath = Path.GetFullPath(libpath);
+            _libpath = libpath;
             Init();
         }
 
         void Init()
         {
-            if (!File.Exists(_libpath))
-                throw new FileNotFoundException($"Library file not found '{_libpath}'");
-
-            // If nonstandard.DLL is NOT loaded already, load it
-
             InitPlatformFuncs();
 
             if (hFTD2XXDLL == IntPtr.Zero)
             {
-                // Load our nonstandard.DLL library
+                // Load our library
                 hFTD2XXDLL = _platformFuncs.LoadLibrary(_libpath);
                 if (hFTD2XXDLL == IntPtr.Zero)
                 {
                     var libfilename = Path.GetFileName(_libpath);
                     var assemblyDir = Path.GetDirectoryName(GetType().Assembly.Location);
-                    // Failed to load our PathToDll library
+                    // Failed to load our library
                     // Give up :(
                     Console.WriteLine($"Attempting to load {libfilename} from:\n" + assemblyDir);
                     hFTD2XXDLL = _platformFuncs.LoadLibrary(Path.Combine(assemblyDir, libfilename));
@@ -112,14 +108,20 @@ namespace FTD2XX_NET
 
         private string GetLibraryPath()
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                return _libpathWindows;
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                return _libpathLinux;
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                throw new NotImplementedException();
-            else
-                throw new NotSupportedException("Unknown OS");
+            switch (_platformFuncs.OperatingSystem)
+            {
+                case OperatingSystem.Windows:
+                    return _libpathWindows;
+
+                case OperatingSystem.Linux:
+                    return _libpathLinux;
+
+                case OperatingSystem.OSX:
+                    throw new NotImplementedException();
+
+                default:
+                    throw new NotSupportedException("Unknown OS");
+            }
         }
 
         private void FindFunctionPointers()
@@ -6585,6 +6587,48 @@ namespace FTD2XX_NET
             }
 
             return;
+        }
+
+        #endregion
+
+
+        #region IDisposable Support
+        private bool disposedValue = false; // To detect redundant calls
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    // TODO: dispose managed state (managed objects).
+                }
+
+                // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
+                // TODO: set large fields to null.
+
+                _platformFuncs.FreeLibrary(hFTD2XXDLL);
+
+                _platformFuncs.Dispose();
+
+                disposedValue = true;
+            }
+        }
+
+        // TODO: override a finalizer only if Dispose(bool disposing) above has code to free unmanaged resources.
+        // ~FTDI()
+        // {
+        //   // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+        //   Dispose(false);
+        // }
+
+        // This code added to correctly implement the disposable pattern.
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+            Dispose(true);
+            // TODO: uncomment the following line if the finalizer is overridden above.
+            // GC.SuppressFinalize(this);
         }
         #endregion
     }

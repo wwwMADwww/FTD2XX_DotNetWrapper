@@ -4,7 +4,7 @@ using System.Text;
 
 namespace FTD2X_DotNetWrapper.Platform
 {
-    public interface IPlatformFuncs
+    public interface IPlatformFuncs: IDisposable
     {
 
         IntPtr LoadLibrary(string name);
@@ -13,5 +13,10 @@ namespace FTD2X_DotNetWrapper.Platform
 
         int FreeLibrary(IntPtr libraryHandle);
 
+        OperatingSystem OperatingSystem { get; }
+
     }
+
+    public enum OperatingSystem { Windows, Linux, OSX }
+
 }
