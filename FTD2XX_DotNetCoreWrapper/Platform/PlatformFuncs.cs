@@ -4,7 +4,7 @@ using System.Text;
 using System.Runtime.InteropServices;
 using System.Threading;
 
-namespace FTD2X_DotNetWrapper.Platform
+namespace FTD2XX_NET.Platform
 {
     public class PlatformFuncs: IPlatformFuncs
     {

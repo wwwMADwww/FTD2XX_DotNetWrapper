@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace FTD2X_DotNetWrapper.Platform
+namespace FTD2XX_NET.Platform
 {
     public interface IPlatformFuncs: IDisposable
     {

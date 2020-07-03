@@ -28,8 +28,8 @@ using System.Text;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.IO;
-using FTD2X_DotNetWrapper.Platform;
-using OperatingSystem = FTD2X_DotNetWrapper.Platform.OperatingSystem;
+using FTD2XX_NET.Platform;
+using OperatingSystem = FTD2XX_NET.Platform.OperatingSystem;
 
 namespace FTD2XX_NET
 {
@@ -192,19 +192,6 @@ namespace FTD2XX_NET
             hFTD2XXDLL = IntPtr.Zero;
         }
         #endregion
-
-        // #region LOAD_LIBRARIES
-        // /// <summary>
-        // /// Built-in Windows API functions to allow us to dynamically load our own DLL.
-        // /// Will allow us to use old versions of the DLL that do not have all of these functions available.
-        // /// </summary>
-        // [DllImport("kernel32.dll")]
-        // private static extern IntPtr LoadLibrary(string dllToLoad);
-        // [DllImport("kernel32.dll")]
-        // private static extern IntPtr _platformFuncs.GetSymbol(IntPtr hModule, string procedureName);
-        // [DllImport("kernel32.dll")]
-        // private static extern bool FreeLibrary(IntPtr hModule);
-        // #endregion
 
         #region DELEGATES
         // Definitions for FTD2XX functions

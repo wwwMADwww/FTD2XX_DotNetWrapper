@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
+    <RootNamespace>FTD2XX_NET</RootNamespace>
   </PropertyGroup>
 
 </Project>
