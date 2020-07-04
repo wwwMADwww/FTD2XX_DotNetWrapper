@@ -102,12 +102,13 @@ namespace FTD2XX_NET
 
         void InitPlatformFuncs()
         {
-            _platformFuncs = new PlatformFuncs();
-            
+            if (_platformFuncs == null)
+                _platformFuncs = new PlatformFuncs();
         }
 
         private string GetLibraryPath()
         {
+            InitPlatformFuncs();
             switch (_platformFuncs.OperatingSystem)
             {
                 case OperatingSystem.Windows:
