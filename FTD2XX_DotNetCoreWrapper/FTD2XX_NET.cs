@@ -2166,10 +2166,10 @@ namespace FTD2XX_NET
                         devicelist[i].SerialNumber = Encoding.ASCII.GetString(sernum);
                         devicelist[i].Description = Encoding.ASCII.GetString(desc);
                         // Trim strings to first occurrence of a null terminator character
-                        nullIndex = devicelist[i].SerialNumber.IndexOf("\0");
+                        nullIndex = devicelist[i].SerialNumber.IndexOf('\0');
                         if (nullIndex != -1)
                             devicelist[i].SerialNumber = devicelist[i].SerialNumber.Substring(0, nullIndex);
-                        nullIndex = devicelist[i].Description.IndexOf("\0");
+                        nullIndex = devicelist[i].Description.IndexOf('\0');
                         if (nullIndex != -1)
                             devicelist[i].Description = devicelist[i].Description.Substring(0, nullIndex);
                     }
@@ -5324,7 +5324,7 @@ namespace FTD2XX_NET
                     // Call FT_GetDeviceInfo
                     ftStatus = FT_GetDeviceInfo(ftHandle, ref DeviceType, ref DeviceID, sernum, desc, IntPtr.Zero);
                     Description = Encoding.ASCII.GetString(desc);
-                    Description = Description.Substring(0, Description.IndexOf("\0"));
+                    Description = Description.Substring(0, Description.IndexOf('\0'));
                 }
             }
             else
@@ -5373,7 +5373,7 @@ namespace FTD2XX_NET
                     // Call FT_GetDeviceInfo
                     ftStatus = FT_GetDeviceInfo(ftHandle, ref DeviceType, ref DeviceID, sernum, desc, IntPtr.Zero);
                     SerialNumber = Encoding.ASCII.GetString(sernum);
-                    SerialNumber = SerialNumber.Substring(0, SerialNumber.IndexOf("\0"));
+                    SerialNumber = SerialNumber.Substring(0, SerialNumber.IndexOf('\0'));
                 }
             }
             else
