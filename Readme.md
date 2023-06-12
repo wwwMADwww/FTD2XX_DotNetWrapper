@@ -1,5 +1,5 @@
-# FTD2XX_DotNetCoreWrapper
+# FTD2XX_DotNetWrapper
 
-FT2XX wrapper for .NET Core with both Windows and Linux support.
+FT2XX wrapper for .NET Core+ supporting library load on Windows and Linux.
 
-Based on source code of official [FTD2XX_DotNetWrapper](https://www.ftdichip.com/Support/SoftwareExamples/CodeExamples/CSharp.htm) for .NET Framework from FTDI site.
+Based on `FTD2XX_NET.cs` from [FTDI C# examples page](https://ftdichip.com/software-examples/code-examples/csharp-examples/).
