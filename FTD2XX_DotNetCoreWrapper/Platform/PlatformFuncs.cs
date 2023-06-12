@@ -50,8 +50,11 @@ namespace FTD2XX_NET.Platform
             {
                 OperatingSystem = OperatingSystem.Linux;
 
-                // TryLoad ?
-                _libHandle = NativeLibrary.Load("libdl.so");
+                if (!NativeLibrary.TryLoad("libdl.so"  , out _libHandle) && 
+                    !NativeLibrary.TryLoad("libdl.so.2", out _libHandle))
+                {
+                    throw new Exception("Can't load neither libdl.so nor libdl.so.2");
+                }
 
 
                 // TryGetExport
@@ -102,7 +105,10 @@ namespace FTD2XX_NET.Platform
                 // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
                 // TODO: set large fields to null.
 
-                NativeLibrary.Free(_libHandle);
+                if (_libHandle != null)
+                {
+                    NativeLibrary.Free(_libHandle);
+                }
                 _libHandle = IntPtr.Zero;
 
                 _loadLibraryFunc = null;
