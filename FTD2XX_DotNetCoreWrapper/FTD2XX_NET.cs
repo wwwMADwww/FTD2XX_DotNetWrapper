@@ -1,7 +1,7 @@
 /*
 ** FTD2XX_NET.cs
 **
-** Copyright ï¿½ 2009-2013 Future Technology Devices International Limited
+** Copyright © 2009-2021 Future Technology Devices International Limited
 **
 ** C# Source file for .NET wrapper of the Windows FTD2XX.dll API calls.
 ** Main module
@@ -17,8 +17,8 @@
 **  1.0.12	-	Included support for the FT232H device.
 **  1.0.14	-	Included Support for the X-Series of devices.
 **  1.0.16  -	Overloaded constructor to allow a path to the driver to be passed.
-**  1.1.0   -   Handle full 16 character Serial Number and support FT4222 programming board.
-** 
+**  1.1.0	-	Handle full 16 character Serial Number and support FT4222 programming board.
+**  1.1.2	-	Add new devices and change NULL string for .NET 5 compaibility.
 */
 
 
@@ -181,6 +181,7 @@ namespace FTD2XX_NET
             pFT_EEPROM_Program = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_EEPROM_Program");
             pFT_VendorCmdGet = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_VendorCmdGet");
             pFT_VendorCmdSet = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_VendorCmdSet");
+            pFT_VendorCmdSetX = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_VendorCmdSetX");
         }
 
         /// <summary>
@@ -315,6 +316,8 @@ namespace FTD2XX_NET
         private delegate FT_STATUS tFT_VendorCmdGet(IntPtr ftHandle, UInt16 request, byte[] buf, UInt16 len);
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate FT_STATUS tFT_VendorCmdSet(IntPtr ftHandle, UInt16 request, byte[] buf, UInt16 len);
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate FT_STATUS tFT_VendorCmdSetX(IntPtr ftHandle, UInt16 request, byte[] buf, UInt16 len);
 
         #endregion
 
@@ -891,7 +894,7 @@ namespace FTD2XX_NET
             /// <summary>
             /// FT8U232AM or FT8U245AM device
             /// </summary>
-            FT_DEVICE_AM,
+            FT_DEVICE_AM, /// 1 
             /// <summary>
             /// FT8U100AX device
             /// </summary>
@@ -907,39 +910,83 @@ namespace FTD2XX_NET
             /// <summary>
             /// FT232R or FT245R device
             /// </summary>
-            FT_DEVICE_232R,
+            FT_DEVICE_232R, /// 5
             /// <summary>
             /// FT2232H device
             /// </summary>
-            FT_DEVICE_2232H,
+            FT_DEVICE_2232H, /// 6
             /// <summary>
             /// FT4232H device
             /// </summary>
-            FT_DEVICE_4232H,
+            FT_DEVICE_4232H, /// 7
             /// <summary>
             /// FT232H device
             /// </summary>
-            FT_DEVICE_232H,
+            FT_DEVICE_232H, /// 8
             /// <summary>
             /// FT X-Series device
             /// </summary>
-            FT_DEVICE_X_SERIES,
+            FT_DEVICE_X_SERIES, /// 9
             /// <summary>
             /// FT4222 hi-speed device Mode 0 - 2 interfaces
             /// </summary>
-            FT_DEVICE_4222H_0,
+            FT_DEVICE_4222H_0, /// 10
             /// <summary>
             /// FT4222 hi-speed device Mode 1 or 2 - 4 interfaces
             /// </summary>
-            FT_DEVICE_4222H_1_2,
+            FT_DEVICE_4222H_1_2, /// 11
             /// <summary>
             /// FT4222 hi-speed device Mode 3 - 1 interface
             /// </summary>
-            FT_DEVICE_4222H_3,
+            FT_DEVICE_4222H_3, /// 12
             /// <summary>
             /// OTP programmer board for the FT4222.
             /// </summary>
-            FT_DEVICE_4222_PROG,
+            FT_DEVICE_4222_PROG, /// 13
+            /// <summary>
+            /// OTP programmer board for the FT900.
+            /// </summary>
+            FT_DEVICE_FT900, /// 14
+            /// <summary>
+            /// OTP programmer board for the FT930.
+            /// </summary>
+            FT_DEVICE_FT930, /// 15
+            /// <summary>
+            /// Flash programmer board for the UMFTPD3A.
+            /// </summary>
+            FT_DEVICE_UMFTPD3A, /// 16
+            /// <summary>
+            /// FT2233HP hi-speed device.
+            /// </summary>
+            FT_DEVICE_2233HP, /// 17
+            /// <summary>
+            /// FT4233HP hi-speed device.
+            /// </summary>
+            FT_DEVICE_4233HP, /// 18
+            /// <summary>
+            /// FT2233HP hi-speed device.
+            /// </summary>
+            FT_DEVICE_2232HP, /// 19
+            /// <summary>
+            /// FT4233HP hi-speed device.
+            /// </summary>
+            FT_DEVICE_4232HP, /// 20
+            /// <summary>
+            /// FT233HP hi-speed device.
+            /// </summary>
+            FT_DEVICE_233HP, /// 21
+            /// <summary>
+            /// FT232HP hi-speed device.
+            /// </summary>
+            FT_DEVICE_232HP, /// 22
+            /// <summary>
+            /// FT2233HA hi-speed device.
+            /// </summary>
+            FT_DEVICE_2232HA, /// 23
+            /// <summary>
+            /// FT4233HA hi-speed device.
+            /// </summary>
+            FT_DEVICE_4232HA, /// 24
         };
 #endregion
 
@@ -2070,6 +2117,7 @@ namespace FTD2XX_NET
         IntPtr pFT_EEPROM_Program = IntPtr.Zero;
         IntPtr pFT_VendorCmdGet = IntPtr.Zero;
         IntPtr pFT_VendorCmdSet = IntPtr.Zero;
+        IntPtr pFT_VendorCmdSetX = IntPtr.Zero;
         #endregion
 
         #region METHOD_DEFINITIONS
@@ -2453,15 +2501,15 @@ namespace FTD2XX_NET
                     byte WordLength = FT_DATA_BITS.FT_BITS_8;
                     byte StopBits = FT_STOP_BITS.FT_STOP_BITS_1;
                     byte Parity = FT_PARITY.FT_PARITY_NONE;
-                    ftStatus = FT_SetDataCharacteristics(ftHandle, WordLength, StopBits, Parity);
+                    FT_SetDataCharacteristics(ftHandle, WordLength, StopBits, Parity);
                     // Initialise to no flow control
                     UInt16 FlowControl = FT_FLOW_CONTROL.FT_FLOW_NONE;
                     byte Xon = 0x11;
                     byte Xoff = 0x13;
-                    ftStatus = FT_SetFlowControl(ftHandle, FlowControl, Xon, Xoff);
+                    FT_SetFlowControl(ftHandle, FlowControl, Xon, Xoff);
                     // Initialise Baud rate
                     UInt32 BaudRate = 9600;
-                    ftStatus = FT_SetBaudRate(ftHandle, BaudRate);
+                    FT_SetBaudRate(ftHandle, BaudRate);
                 }
             }
             else
@@ -3228,7 +3276,11 @@ namespace FTD2XX_NET
                             ErrorHandler(ftStatus, ftErrorCondition);
                         }
                     }
-                    else if ((DeviceType == FT_DEVICE.FT_DEVICE_2232H) && (BitMode != FT_BIT_MODES.FT_BIT_MODE_RESET))
+                    else if (((DeviceType == FT_DEVICE.FT_DEVICE_2232H) 
+                        || (DeviceType == FT_DEVICE.FT_DEVICE_2232HP) 
+                        || (DeviceType == FT_DEVICE.FT_DEVICE_2233HP)
+                        || (DeviceType == FT_DEVICE.FT_DEVICE_2232HA))
+                            && (BitMode != FT_BIT_MODES.FT_BIT_MODE_RESET))
                     {
                         if ((BitMode & (FT_BIT_MODES.FT_BIT_MODE_ASYNC_BITBANG | FT_BIT_MODES.FT_BIT_MODE_MPSSE | FT_BIT_MODES.FT_BIT_MODE_SYNC_BITBANG | FT_BIT_MODES.FT_BIT_MODE_MCU_HOST | FT_BIT_MODES.FT_BIT_MODE_FAST_SERIAL | FT_BIT_MODES.FT_BIT_MODE_SYNC_FIFO)) == 0)
                         {
@@ -3244,7 +3296,11 @@ namespace FTD2XX_NET
                             ErrorHandler(ftStatus, ftErrorCondition);
                         }
                     }
-                    else if ((DeviceType == FT_DEVICE.FT_DEVICE_4232H) && (BitMode != FT_BIT_MODES.FT_BIT_MODE_RESET))
+                    else if (((DeviceType == FT_DEVICE.FT_DEVICE_4232H)
+                        || (DeviceType == FT_DEVICE.FT_DEVICE_4232HP)
+                        || (DeviceType == FT_DEVICE.FT_DEVICE_4233HP)
+                        || (DeviceType == FT_DEVICE.FT_DEVICE_4232HA))
+                            && (BitMode != FT_BIT_MODES.FT_BIT_MODE_RESET))
                     {
                         if ((BitMode & (FT_BIT_MODES.FT_BIT_MODE_ASYNC_BITBANG | FT_BIT_MODES.FT_BIT_MODE_MPSSE | FT_BIT_MODES.FT_BIT_MODE_SYNC_BITBANG)) == 0)
                         {
@@ -3260,7 +3316,10 @@ namespace FTD2XX_NET
                             ErrorHandler(ftStatus, ftErrorCondition);
                         }
                     }
-                    else if ((DeviceType == FT_DEVICE.FT_DEVICE_232H) && (BitMode != FT_BIT_MODES.FT_BIT_MODE_RESET))
+                    else if (((DeviceType == FT_DEVICE.FT_DEVICE_232H)
+                        || (DeviceType == FT_DEVICE.FT_DEVICE_232HP)
+                        || (DeviceType == FT_DEVICE.FT_DEVICE_233HP)) 
+                            && (BitMode != FT_BIT_MODES.FT_BIT_MODE_RESET))
                     {
                         // FT232H supports all current bit modes!
                         if (BitMode > FT_BIT_MODES.FT_BIT_MODE_SYNC_FIFO)
@@ -3993,7 +4052,9 @@ namespace FTD2XX_NET
                     FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
                     // Check that it is an FT232H that we are trying to read
                     GetDeviceType(ref DeviceType);
-                    if (DeviceType != FT_DEVICE.FT_DEVICE_232H)
+                    if ((DeviceType != FT_DEVICE.FT_DEVICE_232H)
+                        && (DeviceType != FT_DEVICE.FT_DEVICE_232HP)
+                        && (DeviceType != FT_DEVICE.FT_DEVICE_233HP))
                     {
                         // If it is not, throw an exception
                         ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
@@ -6448,14 +6509,19 @@ namespace FTD2XX_NET
                 {
                     FT_DEVICE deviceType = FT_DEVICE.FT_DEVICE_BM;
                     GetDeviceType(ref deviceType);
-                    if ((deviceType == FT_DEVICE.FT_DEVICE_2232) | (deviceType == FT_DEVICE.FT_DEVICE_2232H) | (deviceType == FT_DEVICE.FT_DEVICE_4232H))
+                    if (deviceType == FTD2XX_NET.FTDI.FT_DEVICE.FT_DEVICE_2232H ||
+                        deviceType == FTD2XX_NET.FTDI.FT_DEVICE.FT_DEVICE_4232H ||
+                        deviceType == FTD2XX_NET.FTDI.FT_DEVICE.FT_DEVICE_2233HP ||
+                        deviceType == FTD2XX_NET.FTDI.FT_DEVICE.FT_DEVICE_4233HP ||
+                        deviceType == FTD2XX_NET.FTDI.FT_DEVICE.FT_DEVICE_2232HP ||
+                        deviceType == FTD2XX_NET.FTDI.FT_DEVICE.FT_DEVICE_4232HP ||
+                        deviceType == FTD2XX_NET.FTDI.FT_DEVICE.FT_DEVICE_2232HA ||
+                        deviceType == FTD2XX_NET.FTDI.FT_DEVICE.FT_DEVICE_4232HA ||
+                        deviceType == FTD2XX_NET.FTDI.FT_DEVICE.FT_DEVICE_2232)
                     {
-                        // Console.WriteLine("InterfaceIdentifier");
                         string Description;
                         GetDescription(out Description);
-                        Identifier = Description.Length > 0 
-                            ? Description.Substring((Description.Length - 1))
-                            : "";
+                        Identifier = Description.Substring((Description.Length - 1));
                         return Identifier;
                     }
                 }
