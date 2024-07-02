@@ -29,6 +29,7 @@ using System.Threading;
 using System.IO;
 using FTD2XX_NET.Platform;
 using OperatingSystem = FTD2XX_NET.Platform.OperatingSystem;
+using System.Runtime.CompilerServices;
 
 namespace FTD2XX_NET
 {
@@ -134,6 +135,7 @@ namespace FTD2XX_NET
             pFT_Close = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_Close");
             pFT_Read = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_Read");
             pFT_Write = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_Write");
+            pFT_WriteBufPtr = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_Write");
             pFT_GetQueueStatus = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_GetQueueStatus");
             pFT_GetModemStatus = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_GetModemStatus");
             pFT_GetStatus = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_GetStatus");
@@ -212,8 +214,11 @@ namespace FTD2XX_NET
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate FT_STATUS tFT_Read(IntPtr ftHandle, byte[] lpBuffer, UInt32 dwBytesToRead, ref UInt32 lpdwBytesReturned);
+
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate FT_STATUS tFT_Write(IntPtr ftHandle, byte[] lpBuffer, UInt32 dwBytesToWrite, ref UInt32 lpdwBytesWritten);
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate FT_STATUS tFT_WriteBufPtr(IntPtr ftHandle, in byte lpBuffer, UInt32 dwBytesToWrite, ref UInt32 lpdwBytesWritten);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate FT_STATUS tFT_GetQueueStatus(IntPtr ftHandle, ref UInt32 lpdwAmountInRxQueue);
@@ -2070,6 +2075,7 @@ namespace FTD2XX_NET
         IntPtr pFT_Close = IntPtr.Zero;
         IntPtr pFT_Read = IntPtr.Zero;
         IntPtr pFT_Write = IntPtr.Zero;
+        IntPtr pFT_WriteBufPtr = IntPtr.Zero;
         IntPtr pFT_GetQueueStatus = IntPtr.Zero;
         IntPtr pFT_GetModemStatus = IntPtr.Zero;
         IntPtr pFT_GetStatus = IntPtr.Zero;
@@ -2711,6 +2717,103 @@ namespace FTD2XX_NET
             }
             return ftStatus;
         }
+
+
+        //**************************************************************************
+        // Write
+        //**************************************************************************
+        // Intellisense comments
+        /// <summary>
+        /// Write data to an open FTDI device.
+        /// </summary>
+        /// <returns>FT_STATUS value from FT_Write in FTD2XX.DLL</returns>
+        /// <param name="dataBuffer">An array of bytes which contains the data to be written to the device.</param>
+        /// <param name="offset">Buffer offset to start write data from</param>
+        /// <param name="numBytesToWrite">The number of bytes to be written to the device.</param>
+        /// <param name="numBytesWritten">The number of bytes actually written to the device.</param>
+        public FT_STATUS Write(byte[] dataBuffer, Int32 offset, Int32 numBytesToWrite, ref UInt32 numBytesWritten)
+        {
+            // Initialise ftStatus to something other than FT_OK
+            FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
+
+            // If the DLL hasn't been loaded, just return here
+            if (hFTD2XXDLL == IntPtr.Zero)
+                return ftStatus;
+
+            // Check for our required function pointers being set up
+            if (pFT_Write != IntPtr.Zero)
+            {
+                tFT_WriteBufPtr FT_WriteBufPtr = (tFT_WriteBufPtr)Marshal.GetDelegateForFunctionPointer(pFT_WriteBufPtr, typeof(tFT_WriteBufPtr));
+
+                if (ftHandle != IntPtr.Zero)
+                {
+                    unsafe
+                    {
+                        var span = dataBuffer.AsSpan(offset, numBytesToWrite);
+                        fixed (byte* ptr = span)
+                        {
+                            ftStatus = FT_WriteBufPtr(ftHandle, Unsafe.AsRef<byte>(ptr), (UInt32)numBytesToWrite, ref numBytesWritten);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                if (pFT_Write == IntPtr.Zero)
+                {
+                    Console.WriteLine("Failed to load function FT_Write.");
+                }
+            }
+            return ftStatus;
+        }
+
+
+
+        //**************************************************************************
+        // Write
+        //**************************************************************************
+        // Intellisense comments
+        /// <summary>
+        /// Write data to an open FTDI device.
+        /// </summary>
+        /// <returns>FT_STATUS value from FT_Write in FTD2XX.DLL</returns>
+        /// <param name="dataBuffer">An array of bytes which contains the data to be written to the device.</param>
+        /// <param name="numBytesWritten">The number of bytes actually written to the device.</param>
+        public FT_STATUS Write(Span<byte> dataBuffer, ref UInt32 numBytesWritten)
+        {
+            // Initialise ftStatus to something other than FT_OK
+            FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
+
+            // If the DLL hasn't been loaded, just return here
+            if (hFTD2XXDLL == IntPtr.Zero)
+                return ftStatus;
+
+            // Check for our required function pointers being set up
+            if (pFT_Write != IntPtr.Zero)
+            {
+                tFT_WriteBufPtr FT_WriteBufPtr = (tFT_WriteBufPtr)Marshal.GetDelegateForFunctionPointer(pFT_WriteBufPtr, typeof(tFT_WriteBufPtr));
+
+                if (ftHandle != IntPtr.Zero)
+                {
+                    unsafe
+                    {
+                        fixed (byte* ptr = dataBuffer)
+                        {
+                            ftStatus = FT_WriteBufPtr(ftHandle, Unsafe.AsRef<byte>(ptr), (UInt32)dataBuffer.Length, ref numBytesWritten);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                if (pFT_Write == IntPtr.Zero)
+                {
+                    Console.WriteLine("Failed to load function FT_Write.");
+                }
+            }
+            return ftStatus;
+        }
+
 
         // Intellisense comments
         /// <summary>
