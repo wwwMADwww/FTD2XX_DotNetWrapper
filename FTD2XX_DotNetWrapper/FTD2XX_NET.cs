@@ -26,7 +26,6 @@ using System;
 using System.Text;
 using System.Runtime.InteropServices;
 using System.Threading;
-using System.IO;
 
 namespace FTD2XX_NET
 {

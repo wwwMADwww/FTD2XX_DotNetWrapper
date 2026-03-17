@@ -2,8 +2,6 @@
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using FTD2XX_NET.Platform;
-using OperatingSystem = FTD2XX_NET.Platform.OperatingSystem;
 
 namespace FTD2XX_NET
 {
@@ -15,13 +13,8 @@ namespace FTD2XX_NET
         const string _libpathLinux = "/usr/local/lib/libftd2xx.so";
 
 
-        IPlatformFuncs _platformFuncs;
-
-
         void Init(string libpath = null)
         {
-            _platformFuncs = new PlatformFuncs();
-
             if (libpath == null)
             {
                 libpath = GetLibraryPath();
@@ -56,36 +49,28 @@ namespace FTD2XX_NET
 
         private IntPtr LoadLibrary(string dllToLoad)
         {
-            return _platformFuncs.LoadLibrary(dllToLoad);
+            return NativeLibrary.Load(dllToLoad);
         }
 
         private IntPtr GetProcAddress(IntPtr hModule, string procedureName)
         {
-            return _platformFuncs.GetSymbol(hModule, procedureName);
+            return NativeLibrary.GetExport(hModule, procedureName);
         }
 
         private bool FreeLibrary(IntPtr hModule)
         {
-            return _platformFuncs.FreeLibrary(hModule) != 0;
+            NativeLibrary.Free(hModule);
+            return true;
         }
 
 
         private string GetLibraryPath()
         {
-            switch (_platformFuncs.OperatingSystem)
-            {
-                case OperatingSystem.Windows:
-                    return _libpathWindows;
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return _libpathWindows;
 
-                case OperatingSystem.Linux:
-                    return _libpathLinux;
-
-                case OperatingSystem.OSX:
-                    throw new NotImplementedException("Loading FT2XX library not implemented for OSX");
-
-                default:
-                    throw new NotSupportedException("Unknown OS");
-            }
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return _libpathLinux;
+            
+            throw new NotImplementedException("Loading FT2XX library not implemented for this OS");
         }
 
 
@@ -104,9 +89,8 @@ namespace FTD2XX_NET
                 // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
                 // TODO: set large fields to null.
 
-                _platformFuncs.FreeLibrary(hFTD2XXDLL);
-
-                _platformFuncs.Dispose();
+                NativeLibrary.Free(hFTD2XXDLL);
+                hFTD2XXDLL = IntPtr.Zero;
 
                 disposedValue = true;
             }
