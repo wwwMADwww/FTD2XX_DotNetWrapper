@@ -21,6 +21,7 @@
 **  1.1.2	-	Add new devices and change NULL string for .NET 5 compaibility.
 */
 
+// based on FTD2XX_NET_SRC_v1.3.4
 
 using System;
 using System.Text;
@@ -34,6 +35,8 @@ namespace FTD2XX_NET
     /// </summary>
     public partial class FTDI
     {
+        private const byte FT_DRIVER_TYPE_D2XX = 0;
+        private const byte FT_DRIVER_TYPE_VCP = 1;
         #region CONSTRUCTOR_DESTRUCTOR
         // constructor
         /// <summary>
@@ -667,7 +670,8 @@ namespace FTD2XX_NET
             /// <summary>
             /// FT232H CBUS EEPROM options - 15MHz clock
             /// </summary>
-            public const byte FT_CBUS_CLK15 = 0x0B;/// <summary>
+            public const byte FT_CBUS_CLK15 = 0x0B;
+            /// <summary>
             /// FT232H CBUS EEPROM options - 7.5MHz clock
             /// </summary>
             public const byte FT_CBUS_CLK7_5 = 0x0C;
@@ -973,8 +977,8 @@ namespace FTD2XX_NET
 
         #region EEPROM_STRUCTURES
         // Internal structure for reading and writing EEPROM contents
-        // NOTE:  NEED Pack=1 for byte alignment!  Without this, data is garbage
-        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        // CharSet.Ansi is required for legacy FT_EE_Read/Program API compatibility
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
         private class FT_PROGRAM_DATA
         {
             public UInt32 Signature1;
@@ -1117,7 +1121,7 @@ namespace FTD2XX_NET
             public byte PowerSaveEnableH;	// non-zero if using ACBUS7 to save power for self-powered designs
         }
 
-        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        [StructLayout(LayoutKind.Sequential)]
         struct FT_EEPROM_HEADER
         {
             public UInt32 deviceType;		// FTxxxx device type to be programmed
@@ -1133,7 +1137,188 @@ namespace FTD2XX_NET
             public byte PullDownEnable;		// non-zero if pull down in suspend enabled
         }
 
-        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        // NOTE:
+        // FT_EEPROM_* structs are passed to FT_EEPROM_Read/FT_EEPROM_Program.
+        // The native DLL uses default structure packing (natural alignment).
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct FT_232B_DATA
+        {
+            public FT_EEPROM_HEADER common;
+            // FT232B specific
+            public byte Rev4;
+            public byte IsoIn;
+            public byte IsoOut;
+            public byte USBVersionEnable;
+            public UInt16 USBVersion;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct FT_2232_DATA
+        {
+            public FT_EEPROM_HEADER common;
+            // FT2232 specific
+            public byte Rev5;
+            public byte IsoInA;
+            public byte IsoInB;
+            public byte IsoOutA;
+            public byte IsoOutB;
+            public byte USBVersionEnable;
+            public UInt16 USBVersion;
+            public byte AIsHighCurrent;
+            public byte BIsHighCurrent;
+            public byte IFAIsFifo;
+            public byte IFAIsFifoTar;
+            public byte IFAIsFastSer;
+            public byte AIsVCP;
+            public byte IFBIsFifo;
+            public byte IFBIsFifoTar;
+            public byte IFBIsFastSer;
+            public byte BIsVCP;
+        }
+
+	        [StructLayout(LayoutKind.Sequential)]
+	        struct FT_232R_DATA
+	        {
+	            public FT_EEPROM_HEADER common;
+	            // FT232R specific (matches FT_EEPROM_232R from ftd2xx.h)
+	            public byte IsHighCurrent;
+	            public byte UseExtOsc;
+	            public byte InvertTXD;
+	            public byte InvertRXD;
+	            public byte InvertRTS;
+	            public byte InvertCTS;
+	            public byte InvertDTR;
+	            public byte InvertDSR;
+	            public byte InvertDCD;
+	            public byte InvertRI;
+	            public byte Cbus0;
+	            public byte Cbus1;
+	            public byte Cbus2;
+	            public byte Cbus3;
+	            public byte Cbus4;
+	            public byte DriverType;
+	        }
+
+	        // Legacy layout used by older revisions of this wrapper and accepted by the current Windows D2XX.
+	        // Some D2XX builds return FT_INVALID_PARAMETER when passed the header-accurate FT_EEPROM_232R layout above.
+	        [StructLayout(LayoutKind.Sequential)]
+	        struct FT_232R_DATA_LEGACY
+	        {
+	            public FT_EEPROM_HEADER common;
+	            public byte UseExtOsc;
+	            public byte HighDriveIOs;
+	            public byte EndpointSize;
+	            public byte PullDownEnable;
+	            public byte SerNumEnable;
+	            public byte InvertTXD;
+	            public byte InvertRXD;
+	            public byte InvertRTS;
+	            public byte InvertCTS;
+	            public byte InvertDTR;
+	            public byte InvertDSR;
+	            public byte InvertDCD;
+	            public byte InvertRI;
+	            public byte Cbus0;
+	            public byte Cbus1;
+	            public byte Cbus2;
+	            public byte Cbus3;
+	            public byte Cbus4;
+	            public byte RIsD2XX;
+	        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct FT_2232H_DATA
+        {
+            public FT_EEPROM_HEADER common;
+            // FT2232H specific
+            public byte ALSlowSlew;
+            public byte ALSchmittInput;
+            public byte ALDriveCurrent;
+            public byte AHSlowSlew;
+            public byte AHSchmittInput;
+            public byte AHDriveCurrent;
+            public byte BLSlowSlew;
+            public byte BLSchmittInput;
+            public byte BLDriveCurrent;
+            public byte BHSlowSlew;
+            public byte BHSchmittInput;
+            public byte BHDriveCurrent;
+            // Hardware options
+            public byte AIsFifo;
+            public byte AIsFifoTar;
+            public byte AIsFastSer;
+            public byte BIsFifo;
+            public byte BIsFifoTar;
+            public byte BIsFastSer;
+            public byte PowerSaveEnable;
+            // Driver options (FT_DRIVER_TYPE_*)
+            public byte ADriverType;
+            public byte BDriverType;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct FT_4232H_DATA
+        {
+            public FT_EEPROM_HEADER common;
+            // FT4232H specific
+            public byte ASlowSlew;
+            public byte ASchmittInput;
+            public byte ADriveCurrent;
+            public byte BSlowSlew;
+            public byte BSchmittInput;
+            public byte BDriveCurrent;
+            public byte CSlowSlew;
+            public byte CSchmittInput;
+            public byte CDriveCurrent;
+            public byte DSlowSlew;
+            public byte DSchmittInput;
+            public byte DDriveCurrent;
+            public byte ARIIsTXDEN;
+            public byte BRIIsTXDEN;
+            public byte CRIIsTXDEN;
+            public byte DRIIsTXDEN;
+            // Driver options (FT_DRIVER_TYPE_*)
+            public byte ADriverType;
+            public byte BDriverType;
+            public byte CDriverType;
+            public byte DDriverType;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct FT_232H_DATA
+        {
+            public FT_EEPROM_HEADER common;
+            // FT232H specific
+            public byte ACSlowSlew;
+            public byte ACSchmittInput;
+            public byte ACDriveCurrent;
+            public byte ADSlowSlew;
+            public byte ADSchmittInput;
+            public byte ADDriveCurrent;
+            public byte Cbus0;
+            public byte Cbus1;
+            public byte Cbus2;
+            public byte Cbus3;
+            public byte Cbus4;
+            public byte Cbus5;
+            public byte Cbus6;
+            public byte Cbus7;
+            public byte Cbus8;
+            public byte Cbus9;
+            public byte FT1248Cpol;
+            public byte FT1248Lsb;
+            public byte FT1248FlowControl;
+            public byte IsFifo;
+            public byte IsFifoTar;
+            public byte IsFastSer;
+            public byte IsFT1248;
+            public byte PowerSaveEnable;
+            // Driver option (FT_DRIVER_TYPE_*)
+            public byte DriverType;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
         struct FT_XSERIES_DATA
         {
             public FT_EEPROM_HEADER common;
@@ -1178,6 +1363,33 @@ namespace FTD2XX_NET
             public byte PowerSaveEnable;		// 
             // Driver option
             public byte DriverType;			// 
+        }
+
+        private static string DecodeNullTerminatedUtf8(byte[] buffer)
+        {
+            if ((buffer == null) || (buffer.Length == 0))
+                return string.Empty;
+
+            int length = Array.IndexOf(buffer, (byte)0);
+            if (length < 0)
+                length = buffer.Length;
+
+            return System.Text.Encoding.UTF8.GetString(buffer, 0, length);
+        }
+
+        private static byte[] EncodeNullTerminatedUtf8(string value, int bufferLength)
+        {
+            byte[] buffer = new byte[bufferLength];
+            if (bufferLength == 0)
+                return buffer;
+
+            if (string.IsNullOrEmpty(value))
+                return buffer;
+
+            byte[] encoded = System.Text.Encoding.UTF8.GetBytes(value);
+            int copyLen = Math.Min(encoded.Length, bufferLength - 1); // keep trailing '\0'
+            Array.Copy(encoded, buffer, copyLen);
+            return buffer;
         }
 
         // Base class for EEPROM structures - these elements are common to all devices
@@ -1956,7 +2168,6 @@ namespace FTD2XX_NET
         /// <summary>
         /// Exceptions thrown by errors within the FTDI class.
         /// </summary>
-        [global::System.Serializable]
         public class FT_EXCEPTION : Exception
         {
             /// <summary>
@@ -1974,15 +2185,7 @@ namespace FTD2XX_NET
             /// <param name="message"></param>
             /// <param name="inner"></param>
             public FT_EXCEPTION(string message, Exception inner) : base(message, inner) { }
-            /// <summary>
-            /// 
-            /// </summary>
-            /// <param name="info"></param>
-            /// <param name="context"></param>
-            protected FT_EXCEPTION(
-            System.Runtime.Serialization.SerializationInfo info,
-            System.Runtime.Serialization.StreamingContext context)
-                : base(info, context) { }
+
         }
         #endregion
 
@@ -3458,26 +3661,79 @@ namespace FTD2XX_NET
             FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
             FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
 
+            // Validate parameter
+            if (ee232b == null)
+                return ftStatus;
+
             // If the DLL hasn't been loaded, just return here
             if (hFTD2XXDLL == IntPtr.Zero)
                 return ftStatus;
 
-            // Check for our required function pointers being set up
-            if (pFT_EE_Read != IntPtr.Zero)
+            if (ftHandle != IntPtr.Zero)
             {
-                tFT_EE_Read FT_EE_Read = (tFT_EE_Read)Marshal.GetDelegateForFunctionPointer(pFT_EE_Read, typeof(tFT_EE_Read));
-
-                if (ftHandle != IntPtr.Zero)
+                FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
+                // Check that it is an FT232B or FT245B that we are trying to read
+                GetDeviceType(ref DeviceType);
+                if (DeviceType != FT_DEVICE.FT_DEVICE_BM)
                 {
-                    FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
-                    // Check that it is an FT232B or FT245B that we are trying to read
-                    GetDeviceType(ref DeviceType);
-                    if (DeviceType != FT_DEVICE.FT_DEVICE_BM)
+                    // If it is not, throw an exception
+                    ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
+                    ErrorHandler(ftStatus, ftErrorCondition);
+                }
+
+                if (pFT_EEPROM_Read != IntPtr.Zero)
+                {
+                    tFT_EEPROM_Read FT_EEPROM_Read = (tFT_EEPROM_Read)Marshal.GetDelegateForFunctionPointer(pFT_EEPROM_Read, typeof(tFT_EEPROM_Read));
+
+                    FT_232B_DATA eeData = new FT_232B_DATA();
+                    FT_EEPROM_HEADER eeHeader = new FT_EEPROM_HEADER();
+
+                    byte[] manufacturer = new byte[32];
+                    byte[] manufacturerID = new byte[16];
+                    byte[] description = new byte[64];
+                    byte[] serialNumber = new byte[16];
+
+                    eeHeader.deviceType = (uint)FT_DEVICE.FT_DEVICE_BM;
+                    eeData.common = eeHeader;
+
+                    int size = Marshal.SizeOf(eeData);
+                    IntPtr eeDataMarshal = Marshal.AllocHGlobal(size);
+
+                    try
                     {
-                        // If it is not, throw an exception
-                        ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
-                        ErrorHandler(ftStatus, ftErrorCondition);
+                        Marshal.StructureToPtr(eeData, eeDataMarshal, false);
+
+                        ftStatus = FT_EEPROM_Read(ftHandle, eeDataMarshal, (uint)size, manufacturer, manufacturerID, description, serialNumber);
+
+                        if (ftStatus == FT_STATUS.FT_OK)
+                        {
+                            eeData = (FT_232B_DATA)Marshal.PtrToStructure(eeDataMarshal, typeof(FT_232B_DATA));
+
+                            ee232b.Manufacturer = DecodeNullTerminatedUtf8(manufacturer);
+                            ee232b.ManufacturerID = DecodeNullTerminatedUtf8(manufacturerID);
+                            ee232b.Description = DecodeNullTerminatedUtf8(description);
+                            ee232b.SerialNumber = DecodeNullTerminatedUtf8(serialNumber);
+
+                            ee232b.VendorID = eeData.common.VendorId;
+                            ee232b.ProductID = eeData.common.ProductId;
+                            ee232b.MaxPower = eeData.common.MaxPower;
+                            ee232b.SelfPowered = Convert.ToBoolean(eeData.common.SelfPowered);
+                            ee232b.RemoteWakeup = Convert.ToBoolean(eeData.common.RemoteWakeup);
+
+                            ee232b.PullDownEnable = Convert.ToBoolean(eeData.common.PullDownEnable);
+                            ee232b.SerNumEnable = Convert.ToBoolean(eeData.common.SerNumEnable);
+                            ee232b.USBVersionEnable = Convert.ToBoolean(eeData.USBVersionEnable);
+                            ee232b.USBVersion = eeData.USBVersion;
+                        }
                     }
+                    finally
+                    {
+                        Marshal.FreeHGlobal(eeDataMarshal);
+                    }
+                }
+                else if (pFT_EE_Read != IntPtr.Zero)
+                {
+                    tFT_EE_Read FT_EE_Read = (tFT_EE_Read)Marshal.GetDelegateForFunctionPointer(pFT_EE_Read, typeof(tFT_EE_Read));
 
                     FT_PROGRAM_DATA eedata = new FT_PROGRAM_DATA();
 
@@ -3492,40 +3748,45 @@ namespace FTD2XX_NET
                     eedata.Description = Marshal.AllocHGlobal(64);
                     eedata.SerialNumber = Marshal.AllocHGlobal(16);
 
-                    // Call FT_EE_Read
-                    ftStatus = FT_EE_Read(ftHandle, eedata);
+                    try
+                    {
+                        // Call FT_EE_Read
+                        ftStatus = FT_EE_Read(ftHandle, eedata);
 
-                    // Retrieve string values
-                    ee232b.Manufacturer = Marshal.PtrToStringAnsi(eedata.Manufacturer);
-                    ee232b.ManufacturerID = Marshal.PtrToStringAnsi(eedata.ManufacturerID);
-                    ee232b.Description = Marshal.PtrToStringAnsi(eedata.Description);
-                    ee232b.SerialNumber = Marshal.PtrToStringAnsi(eedata.SerialNumber);
+                        if (ftStatus == FT_STATUS.FT_OK)
+                        {
+                            // Retrieve string values
+                            ee232b.Manufacturer = Marshal.PtrToStringAnsi(eedata.Manufacturer);
+                            ee232b.ManufacturerID = Marshal.PtrToStringAnsi(eedata.ManufacturerID);
+                            ee232b.Description = Marshal.PtrToStringAnsi(eedata.Description);
+                            ee232b.SerialNumber = Marshal.PtrToStringAnsi(eedata.SerialNumber);
 
-                    // Free unmanaged buffers
-                    Marshal.FreeHGlobal(eedata.Manufacturer);
-                    Marshal.FreeHGlobal(eedata.ManufacturerID);
-                    Marshal.FreeHGlobal(eedata.Description);
-                    Marshal.FreeHGlobal(eedata.SerialNumber);
-
-                    // Map non-string elements to structure to be returned
-                    // Standard elements
-                    ee232b.VendorID = eedata.VendorID;
-                    ee232b.ProductID = eedata.ProductID;
-                    ee232b.MaxPower = eedata.MaxPower;
-                    ee232b.SelfPowered = Convert.ToBoolean(eedata.SelfPowered);
-                    ee232b.RemoteWakeup = Convert.ToBoolean(eedata.RemoteWakeup);
-                    // B specific fields
-                    ee232b.PullDownEnable = Convert.ToBoolean(eedata.PullDownEnable);
-                    ee232b.SerNumEnable = Convert.ToBoolean(eedata.SerNumEnable);
-                    ee232b.USBVersionEnable = Convert.ToBoolean(eedata.USBVersionEnable);
-                    ee232b.USBVersion = eedata.USBVersion;
+                            // Map non-string elements to structure to be returned
+                            // Standard elements
+                            ee232b.VendorID = eedata.VendorID;
+                            ee232b.ProductID = eedata.ProductID;
+                            ee232b.MaxPower = eedata.MaxPower;
+                            ee232b.SelfPowered = Convert.ToBoolean(eedata.SelfPowered);
+                            ee232b.RemoteWakeup = Convert.ToBoolean(eedata.RemoteWakeup);
+                            // B specific fields
+                            ee232b.PullDownEnable = Convert.ToBoolean(eedata.PullDownEnable);
+                            ee232b.SerNumEnable = Convert.ToBoolean(eedata.SerNumEnable);
+                            ee232b.USBVersionEnable = Convert.ToBoolean(eedata.USBVersionEnable);
+                            ee232b.USBVersion = eedata.USBVersion;
+                        }
+                    }
+                    finally
+                    {
+                        // Free unmanaged buffers
+                        Marshal.FreeHGlobal(eedata.Manufacturer);
+                        Marshal.FreeHGlobal(eedata.ManufacturerID);
+                        Marshal.FreeHGlobal(eedata.Description);
+                        Marshal.FreeHGlobal(eedata.SerialNumber);
+                    }
                 }
-            }
-            else
-            {
-                if (pFT_EE_Read == IntPtr.Zero)
+                else
                 {
-                    Console.WriteLine("Failed to load function FT_EE_Read.");
+                    Console.WriteLine("Failed to load function FT_EEPROM_Read or FT_EE_Read.");
                 }
             }
             return ftStatus;
@@ -3547,26 +3808,89 @@ namespace FTD2XX_NET
             FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
             FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
 
+            // Validate parameter
+            if (ee2232 == null)
+                return ftStatus;
+
             // If the DLL hasn't been loaded, just return here
             if (hFTD2XXDLL == IntPtr.Zero)
                 return ftStatus;
 
-            // Check for our required function pointers being set up
-            if (pFT_EE_Read != IntPtr.Zero)
+            if (ftHandle != IntPtr.Zero)
             {
-                tFT_EE_Read FT_EE_Read = (tFT_EE_Read)Marshal.GetDelegateForFunctionPointer(pFT_EE_Read, typeof(tFT_EE_Read));
-
-                if (ftHandle != IntPtr.Zero)
+                FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
+                // Check that it is an FT2232 that we are trying to read
+                GetDeviceType(ref DeviceType);
+                if (DeviceType != FT_DEVICE.FT_DEVICE_2232)
                 {
-                    FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
-                    // Check that it is an FT2232 that we are trying to read
-                    GetDeviceType(ref DeviceType);
-                    if (DeviceType != FT_DEVICE.FT_DEVICE_2232)
+                    // If it is not, throw an exception
+                    ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
+                    ErrorHandler(ftStatus, ftErrorCondition);
+                }
+
+                if (pFT_EEPROM_Read != IntPtr.Zero)
+                {
+                    tFT_EEPROM_Read FT_EEPROM_Read = (tFT_EEPROM_Read)Marshal.GetDelegateForFunctionPointer(pFT_EEPROM_Read, typeof(tFT_EEPROM_Read));
+
+                    FT_2232_DATA eeData = new FT_2232_DATA();
+                    FT_EEPROM_HEADER eeHeader = new FT_EEPROM_HEADER();
+
+                    byte[] manufacturer = new byte[32];
+                    byte[] manufacturerID = new byte[16];
+                    byte[] description = new byte[64];
+                    byte[] serialNumber = new byte[16];
+
+                    eeHeader.deviceType = (uint)FT_DEVICE.FT_DEVICE_2232;
+                    eeData.common = eeHeader;
+
+                    int size = Marshal.SizeOf(eeData);
+                    IntPtr eeDataMarshal = Marshal.AllocHGlobal(size);
+
+                    try
                     {
-                        // If it is not, throw an exception
-                        ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
-                        ErrorHandler(ftStatus, ftErrorCondition);
+                        Marshal.StructureToPtr(eeData, eeDataMarshal, false);
+
+                        ftStatus = FT_EEPROM_Read(ftHandle, eeDataMarshal, (uint)size, manufacturer, manufacturerID, description, serialNumber);
+
+                        if (ftStatus == FT_STATUS.FT_OK)
+                        {
+                            eeData = (FT_2232_DATA)Marshal.PtrToStructure(eeDataMarshal, typeof(FT_2232_DATA));
+
+                            ee2232.Manufacturer = DecodeNullTerminatedUtf8(manufacturer);
+                            ee2232.ManufacturerID = DecodeNullTerminatedUtf8(manufacturerID);
+                            ee2232.Description = DecodeNullTerminatedUtf8(description);
+                            ee2232.SerialNumber = DecodeNullTerminatedUtf8(serialNumber);
+
+                            ee2232.VendorID = eeData.common.VendorId;
+                            ee2232.ProductID = eeData.common.ProductId;
+                            ee2232.MaxPower = eeData.common.MaxPower;
+                            ee2232.SelfPowered = Convert.ToBoolean(eeData.common.SelfPowered);
+                            ee2232.RemoteWakeup = Convert.ToBoolean(eeData.common.RemoteWakeup);
+
+                            ee2232.PullDownEnable = Convert.ToBoolean(eeData.common.PullDownEnable);
+                            ee2232.SerNumEnable = Convert.ToBoolean(eeData.common.SerNumEnable);
+                            ee2232.USBVersionEnable = Convert.ToBoolean(eeData.USBVersionEnable);
+                            ee2232.USBVersion = eeData.USBVersion;
+                            ee2232.AIsHighCurrent = Convert.ToBoolean(eeData.AIsHighCurrent);
+                            ee2232.BIsHighCurrent = Convert.ToBoolean(eeData.BIsHighCurrent);
+                            ee2232.IFAIsFifo = Convert.ToBoolean(eeData.IFAIsFifo);
+                            ee2232.IFAIsFifoTar = Convert.ToBoolean(eeData.IFAIsFifoTar);
+                            ee2232.IFAIsFastSer = Convert.ToBoolean(eeData.IFAIsFastSer);
+                            ee2232.AIsVCP = Convert.ToBoolean(eeData.AIsVCP);
+                            ee2232.IFBIsFifo = Convert.ToBoolean(eeData.IFBIsFifo);
+                            ee2232.IFBIsFifoTar = Convert.ToBoolean(eeData.IFBIsFifoTar);
+                            ee2232.IFBIsFastSer = Convert.ToBoolean(eeData.IFBIsFastSer);
+                            ee2232.BIsVCP = Convert.ToBoolean(eeData.BIsVCP);
+                        }
                     }
+                    finally
+                    {
+                        Marshal.FreeHGlobal(eeDataMarshal);
+                    }
+                }
+                else if (pFT_EE_Read != IntPtr.Zero)
+                {
+                    tFT_EE_Read FT_EE_Read = (tFT_EE_Read)Marshal.GetDelegateForFunctionPointer(pFT_EE_Read, typeof(tFT_EE_Read));
 
                     FT_PROGRAM_DATA eedata = new FT_PROGRAM_DATA();
 
@@ -3581,50 +3905,168 @@ namespace FTD2XX_NET
                     eedata.Description = Marshal.AllocHGlobal(64);
                     eedata.SerialNumber = Marshal.AllocHGlobal(16);
 
-                    // Call FT_EE_Read
-                    ftStatus = FT_EE_Read(ftHandle, eedata);
+                    try
+                    {
+                        // Call FT_EE_Read
+                        ftStatus = FT_EE_Read(ftHandle, eedata);
 
-                    // Retrieve string values
-                    ee2232.Manufacturer = Marshal.PtrToStringAnsi(eedata.Manufacturer);
-                    ee2232.ManufacturerID = Marshal.PtrToStringAnsi(eedata.ManufacturerID);
-                    ee2232.Description = Marshal.PtrToStringAnsi(eedata.Description);
-                    ee2232.SerialNumber = Marshal.PtrToStringAnsi(eedata.SerialNumber);
+                        if (ftStatus == FT_STATUS.FT_OK)
+                        {
+                            // Retrieve string values
+                            ee2232.Manufacturer = Marshal.PtrToStringAnsi(eedata.Manufacturer);
+                            ee2232.ManufacturerID = Marshal.PtrToStringAnsi(eedata.ManufacturerID);
+                            ee2232.Description = Marshal.PtrToStringAnsi(eedata.Description);
+                            ee2232.SerialNumber = Marshal.PtrToStringAnsi(eedata.SerialNumber);
 
-                    // Free unmanaged buffers
-                    Marshal.FreeHGlobal(eedata.Manufacturer);
-                    Marshal.FreeHGlobal(eedata.ManufacturerID);
-                    Marshal.FreeHGlobal(eedata.Description);
-                    Marshal.FreeHGlobal(eedata.SerialNumber);
-
-                    // Map non-string elements to structure to be returned
-                    // Standard elements
-                    ee2232.VendorID = eedata.VendorID;
-                    ee2232.ProductID = eedata.ProductID;
-                    ee2232.MaxPower = eedata.MaxPower;
-                    ee2232.SelfPowered = Convert.ToBoolean(eedata.SelfPowered);
-                    ee2232.RemoteWakeup = Convert.ToBoolean(eedata.RemoteWakeup);
-                    // 2232 specific fields
-                    ee2232.PullDownEnable = Convert.ToBoolean(eedata.PullDownEnable5);
-                    ee2232.SerNumEnable = Convert.ToBoolean(eedata.SerNumEnable5);
-                    ee2232.USBVersionEnable = Convert.ToBoolean(eedata.USBVersionEnable5);
-                    ee2232.USBVersion = eedata.USBVersion5;
-                    ee2232.AIsHighCurrent = Convert.ToBoolean(eedata.AIsHighCurrent);
-                    ee2232.BIsHighCurrent = Convert.ToBoolean(eedata.BIsHighCurrent);
-                    ee2232.IFAIsFifo = Convert.ToBoolean(eedata.IFAIsFifo);
-                    ee2232.IFAIsFifoTar = Convert.ToBoolean(eedata.IFAIsFifoTar);
-                    ee2232.IFAIsFastSer = Convert.ToBoolean(eedata.IFAIsFastSer);
-                    ee2232.AIsVCP = Convert.ToBoolean(eedata.AIsVCP);
-                    ee2232.IFBIsFifo = Convert.ToBoolean(eedata.IFBIsFifo);
-                    ee2232.IFBIsFifoTar = Convert.ToBoolean(eedata.IFBIsFifoTar);
-                    ee2232.IFBIsFastSer = Convert.ToBoolean(eedata.IFBIsFastSer);
-                    ee2232.BIsVCP = Convert.ToBoolean(eedata.BIsVCP);
+                            // Map non-string elements to structure to be returned
+                            // Standard elements
+                            ee2232.VendorID = eedata.VendorID;
+                            ee2232.ProductID = eedata.ProductID;
+                            ee2232.MaxPower = eedata.MaxPower;
+                            ee2232.SelfPowered = Convert.ToBoolean(eedata.SelfPowered);
+                            ee2232.RemoteWakeup = Convert.ToBoolean(eedata.RemoteWakeup);
+                            // 2232 specific fields
+                            ee2232.PullDownEnable = Convert.ToBoolean(eedata.PullDownEnable5);
+                            ee2232.SerNumEnable = Convert.ToBoolean(eedata.SerNumEnable5);
+                            ee2232.USBVersionEnable = Convert.ToBoolean(eedata.USBVersionEnable5);
+                            ee2232.USBVersion = eedata.USBVersion5;
+                            ee2232.AIsHighCurrent = Convert.ToBoolean(eedata.AIsHighCurrent);
+                            ee2232.BIsHighCurrent = Convert.ToBoolean(eedata.BIsHighCurrent);
+                            ee2232.IFAIsFifo = Convert.ToBoolean(eedata.IFAIsFifo);
+                            ee2232.IFAIsFifoTar = Convert.ToBoolean(eedata.IFAIsFifoTar);
+                            ee2232.IFAIsFastSer = Convert.ToBoolean(eedata.IFAIsFastSer);
+                            ee2232.AIsVCP = Convert.ToBoolean(eedata.AIsVCP);
+                            ee2232.IFBIsFifo = Convert.ToBoolean(eedata.IFBIsFifo);
+                            ee2232.IFBIsFifoTar = Convert.ToBoolean(eedata.IFBIsFifoTar);
+                            ee2232.IFBIsFastSer = Convert.ToBoolean(eedata.IFBIsFastSer);
+                            ee2232.BIsVCP = Convert.ToBoolean(eedata.BIsVCP);
+                        }
+                    }
+                    finally
+                    {
+                        // Free unmanaged buffers
+                        Marshal.FreeHGlobal(eedata.Manufacturer);
+                        Marshal.FreeHGlobal(eedata.ManufacturerID);
+                        Marshal.FreeHGlobal(eedata.Description);
+                        Marshal.FreeHGlobal(eedata.SerialNumber);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Failed to load function FT_EEPROM_Read or FT_EE_Read.");
                 }
             }
-            else
+            return ftStatus;
+        }
+
+        //**************************************************************************
+        // ReadFT232REEPROM_Legacy
+        //**************************************************************************
+        // Intellisense comments
+        /// <summary>
+        /// Reads the EEPROM contents of an FT232R device using the legacy FT_EE_Read API.
+        /// </summary>
+        /// <returns>FT_STATUS value from FT_EE_Read in FTD2XX DLL</returns>
+        /// <param name="ee232r">An FT232R_EEPROM_STRUCTURE which contains only the relevant information for an FT232R device.</param>
+        /// <exception cref="FT_EXCEPTION">Thrown when the current device does not match the type required by this method.</exception>
+        private FT_STATUS ReadFT232REEPROM_Legacy(FT232R_EEPROM_STRUCTURE ee232r)
+        {
+            // Initialise ftStatus to something other than FT_OK
+            FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
+            FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
+
+            // Validate parameter
+            if (ee232r == null)
+                return ftStatus;
+
+            // If the DLL hasn't been loaded, just return here
+            if (hFTD2XXDLL == IntPtr.Zero)
+                return ftStatus;
+
+            if (ftHandle != IntPtr.Zero)
             {
-                if (pFT_EE_Read == IntPtr.Zero)
+                FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
+                // Check that it is an FT232R or FT245R that we are trying to read
+                GetDeviceType(ref DeviceType);
+                if (DeviceType != FT_DEVICE.FT_DEVICE_232R)
                 {
-                    Console.WriteLine("Failed to load function FT_EE_Read.");
+                    // If it is not, throw an exception
+                    ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
+                    ErrorHandler(ftStatus, ftErrorCondition);
+                }
+
+                // Legacy FT_EE_Read implementation used as a fallback when FT_EEPROM_Read is not available.
+                if (pFT_EE_Read != IntPtr.Zero)
+                {
+                    tFT_EE_Read FT_EE_Read = (tFT_EE_Read)Marshal.GetDelegateForFunctionPointer(pFT_EE_Read, typeof(tFT_EE_Read));
+
+                    FT_PROGRAM_DATA eedata = new FT_PROGRAM_DATA();
+
+                    // Set up structure headers
+                    eedata.Signature1 = 0x00000000;
+                    eedata.Signature2 = 0xFFFFFFFF;
+                    eedata.Version = 2;
+
+                    // Allocate space from unmanaged heap
+                    eedata.Manufacturer = Marshal.AllocHGlobal(32);
+                    eedata.ManufacturerID = Marshal.AllocHGlobal(16);
+                    eedata.Description = Marshal.AllocHGlobal(64);
+                    eedata.SerialNumber = Marshal.AllocHGlobal(16);
+
+                    try
+                    {
+                        // Call FT_EE_Read
+                        ftStatus = FT_EE_Read(ftHandle, eedata);
+
+                        if (ftStatus == FT_STATUS.FT_OK)
+                        {
+                            // Retrieve string values
+                            ee232r.Manufacturer = Marshal.PtrToStringAnsi(eedata.Manufacturer);
+                            ee232r.ManufacturerID = Marshal.PtrToStringAnsi(eedata.ManufacturerID);
+                            ee232r.Description = Marshal.PtrToStringAnsi(eedata.Description);
+                            ee232r.SerialNumber = Marshal.PtrToStringAnsi(eedata.SerialNumber);
+
+                            // Map non-string elements to structure to be returned
+                            // Standard elements
+                            ee232r.VendorID = eedata.VendorID;
+                            ee232r.ProductID = eedata.ProductID;
+                            ee232r.MaxPower = eedata.MaxPower;
+                            ee232r.SelfPowered = Convert.ToBoolean(eedata.SelfPowered);
+                            ee232r.RemoteWakeup = Convert.ToBoolean(eedata.RemoteWakeup);
+                            // 232R specific fields
+                            ee232r.UseExtOsc = Convert.ToBoolean(eedata.UseExtOsc);
+                            ee232r.HighDriveIOs = Convert.ToBoolean(eedata.HighDriveIOs);
+                            ee232r.EndpointSize = eedata.EndpointSize;
+                            ee232r.PullDownEnable = Convert.ToBoolean(eedata.PullDownEnableR);
+                            ee232r.SerNumEnable = Convert.ToBoolean(eedata.SerNumEnableR);
+                            ee232r.InvertTXD = Convert.ToBoolean(eedata.InvertTXD);
+                            ee232r.InvertRXD = Convert.ToBoolean(eedata.InvertRXD);
+                            ee232r.InvertRTS = Convert.ToBoolean(eedata.InvertRTS);
+                            ee232r.InvertCTS = Convert.ToBoolean(eedata.InvertCTS);
+                            ee232r.InvertDTR = Convert.ToBoolean(eedata.InvertDTR);
+                            ee232r.InvertDSR = Convert.ToBoolean(eedata.InvertDSR);
+                            ee232r.InvertDCD = Convert.ToBoolean(eedata.InvertDCD);
+                            ee232r.InvertRI = Convert.ToBoolean(eedata.InvertRI);
+                            ee232r.Cbus0 = eedata.Cbus0;
+                            ee232r.Cbus1 = eedata.Cbus1;
+                            ee232r.Cbus2 = eedata.Cbus2;
+                            ee232r.Cbus3 = eedata.Cbus3;
+                            ee232r.Cbus4 = eedata.Cbus4;
+                            ee232r.RIsD2XX = Convert.ToBoolean(eedata.RIsD2XX);
+                        }
+                    }
+                    finally
+                    {
+                        // Free unmanaged buffers
+                        Marshal.FreeHGlobal(eedata.Manufacturer);
+                        Marshal.FreeHGlobal(eedata.ManufacturerID);
+                        Marshal.FreeHGlobal(eedata.Description);
+                        Marshal.FreeHGlobal(eedata.SerialNumber);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Failed to load function FT_EEPROM_Read or FT_EE_Read.");
                 }
             }
             return ftStatus;
@@ -3635,141 +4077,209 @@ namespace FTD2XX_NET
         //**************************************************************************
         // Intellisense comments
         /// <summary>
-        /// Reads the EEPROM contents of an FT232R or FT245R device.
-        /// Calls FT_EE_Read in FTD2XX DLL
+        /// Reads the EEPROM contents of an FT232R device using the FT_EEPROM_Read API.
+        /// Falls back to the legacy FT_EE_Read API when FT_EEPROM_Read is not available.
         /// </summary>
-        /// <returns>An FT232R_EEPROM_STRUCTURE which contains only the relevant information for an FT232R and FT245R device.</returns>
+        /// <returns>FT_STATUS value from the underlying EEPROM API</returns>
+        /// <param name="ee232r">An FT232R_EEPROM_STRUCTURE which contains only the relevant information for an FT232R device.</param>
         /// <exception cref="FT_EXCEPTION">Thrown when the current device does not match the type required by this method.</exception>
         public FT_STATUS ReadFT232REEPROM(FT232R_EEPROM_STRUCTURE ee232r)
         {
-            // Initialise ftStatus to something other than FT_OK
             FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
             FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
 
-            // If the DLL hasn't been loaded, just return here
+            if (ee232r == null)
+                return ftStatus;
+
             if (hFTD2XXDLL == IntPtr.Zero)
                 return ftStatus;
 
-            // Check for our required function pointers being set up
-            if (pFT_EE_Read != IntPtr.Zero)
-            {
-                tFT_EE_Read FT_EE_Read = (tFT_EE_Read)Marshal.GetDelegateForFunctionPointer(pFT_EE_Read, typeof(tFT_EE_Read));
+            if (ftHandle == IntPtr.Zero)
+                return ftStatus;
 
-                if (ftHandle != IntPtr.Zero)
+            FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
+            GetDeviceType(ref DeviceType);
+            if (DeviceType != FT_DEVICE.FT_DEVICE_232R)
+            {
+                ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
+                ErrorHandler(ftStatus, ftErrorCondition);
+            }
+
+            if (pFT_EEPROM_Read == IntPtr.Zero)
+            {
+                if (pFT_EE_Read != IntPtr.Zero)
+                    return ReadFT232REEPROM_Legacy(ee232r);
+
+                return ftStatus;
+            }
+
+            tFT_EEPROM_Read FT_EEPROM_Read = (tFT_EEPROM_Read)Marshal.GetDelegateForFunctionPointer(pFT_EEPROM_Read, typeof(tFT_EEPROM_Read));
+
+            byte[] manufacturer = new byte[32];
+            byte[] manufacturerID = new byte[16];
+            byte[] description = new byte[64];
+            byte[] serialNumber = new byte[16];
+
+            // 1) Try FT_EEPROM_232R layout (as defined in ftd2xx.h).
+            FT_232R_DATA eeData = new FT_232R_DATA();
+            FT_EEPROM_HEADER eeHeader = new FT_EEPROM_HEADER();
+            eeHeader.deviceType = (uint)FT_DEVICE.FT_DEVICE_232R;
+            eeData.common = eeHeader;
+
+            int size = Marshal.SizeOf(eeData);
+            IntPtr eeDataMarshal = Marshal.AllocHGlobal(size);
+
+            try
+            {
+                Marshal.StructureToPtr(eeData, eeDataMarshal, false);
+
+                ftStatus = FT_EEPROM_Read(ftHandle, eeDataMarshal, (uint)size, manufacturer, manufacturerID, description, serialNumber);
+
+                if (ftStatus == FT_STATUS.FT_OK)
                 {
-                    FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
-                    // Check that it is an FT232R or FT245R that we are trying to read
-                    GetDeviceType(ref DeviceType);
-                    if (DeviceType != FT_DEVICE.FT_DEVICE_232R)
+                    eeData = (FT_232R_DATA)Marshal.PtrToStructure(eeDataMarshal, typeof(FT_232R_DATA));
+
+                    ee232r.Manufacturer = DecodeNullTerminatedUtf8(manufacturer);
+                    ee232r.ManufacturerID = DecodeNullTerminatedUtf8(manufacturerID);
+                    ee232r.Description = DecodeNullTerminatedUtf8(description);
+                    ee232r.SerialNumber = DecodeNullTerminatedUtf8(serialNumber);
+
+                    ee232r.VendorID = eeData.common.VendorId;
+                    ee232r.ProductID = eeData.common.ProductId;
+                    ee232r.MaxPower = eeData.common.MaxPower;
+                    ee232r.SelfPowered = Convert.ToBoolean(eeData.common.SelfPowered);
+                    ee232r.RemoteWakeup = Convert.ToBoolean(eeData.common.RemoteWakeup);
+                    ee232r.PullDownEnable = Convert.ToBoolean(eeData.common.PullDownEnable);
+                    ee232r.SerNumEnable = Convert.ToBoolean(eeData.common.SerNumEnable);
+
+                    ee232r.UseExtOsc = Convert.ToBoolean(eeData.UseExtOsc);
+                    ee232r.HighDriveIOs = Convert.ToBoolean(eeData.IsHighCurrent);
+                    ee232r.EndpointSize = 64;
+                    ee232r.InvertTXD = Convert.ToBoolean(eeData.InvertTXD);
+                    ee232r.InvertRXD = Convert.ToBoolean(eeData.InvertRXD);
+                    ee232r.InvertRTS = Convert.ToBoolean(eeData.InvertRTS);
+                    ee232r.InvertCTS = Convert.ToBoolean(eeData.InvertCTS);
+                    ee232r.InvertDTR = Convert.ToBoolean(eeData.InvertDTR);
+                    ee232r.InvertDSR = Convert.ToBoolean(eeData.InvertDSR);
+                    ee232r.InvertDCD = Convert.ToBoolean(eeData.InvertDCD);
+                    ee232r.InvertRI = Convert.ToBoolean(eeData.InvertRI);
+                    ee232r.Cbus0 = eeData.Cbus0;
+                    ee232r.Cbus1 = eeData.Cbus1;
+                    ee232r.Cbus2 = eeData.Cbus2;
+                    ee232r.Cbus3 = eeData.Cbus3;
+                    ee232r.Cbus4 = eeData.Cbus4;
+                    ee232r.RIsD2XX = (eeData.DriverType == FT_DRIVER_TYPE_D2XX);
+
+                    return ftStatus;
+                }
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(eeDataMarshal);
+            }
+
+            // 2) Fallback to legacy layout accepted by current Windows D2XX.
+            if (ftStatus == FT_STATUS.FT_INVALID_PARAMETER)
+            {
+                FT_232R_DATA_LEGACY eeLegacy = new FT_232R_DATA_LEGACY();
+                FT_EEPROM_HEADER eeLegacyHeader = new FT_EEPROM_HEADER();
+                eeLegacyHeader.deviceType = (uint)FT_DEVICE.FT_DEVICE_232R;
+                eeLegacy.common = eeLegacyHeader;
+
+                int legacySize = Marshal.SizeOf(eeLegacy);
+                IntPtr eeLegacyMarshal = Marshal.AllocHGlobal(legacySize);
+
+                try
+                {
+                    Marshal.StructureToPtr(eeLegacy, eeLegacyMarshal, false);
+
+                    ftStatus = FT_EEPROM_Read(ftHandle, eeLegacyMarshal, (uint)legacySize, manufacturer, manufacturerID, description, serialNumber);
+
+                    if (ftStatus == FT_STATUS.FT_OK)
                     {
-                        // If it is not, throw an exception
-                        ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
-                        ErrorHandler(ftStatus, ftErrorCondition);
+                        eeLegacy = (FT_232R_DATA_LEGACY)Marshal.PtrToStructure(eeLegacyMarshal, typeof(FT_232R_DATA_LEGACY));
+
+                        ee232r.Manufacturer = DecodeNullTerminatedUtf8(manufacturer);
+                        ee232r.ManufacturerID = DecodeNullTerminatedUtf8(manufacturerID);
+                        ee232r.Description = DecodeNullTerminatedUtf8(description);
+                        ee232r.SerialNumber = DecodeNullTerminatedUtf8(serialNumber);
+
+                        ee232r.VendorID = eeLegacy.common.VendorId;
+                        ee232r.ProductID = eeLegacy.common.ProductId;
+                        ee232r.MaxPower = eeLegacy.common.MaxPower;
+                        ee232r.SelfPowered = Convert.ToBoolean(eeLegacy.common.SelfPowered);
+                        ee232r.RemoteWakeup = Convert.ToBoolean(eeLegacy.common.RemoteWakeup);
+                        ee232r.PullDownEnable = Convert.ToBoolean(eeLegacy.common.PullDownEnable);
+                        ee232r.SerNumEnable = Convert.ToBoolean(eeLegacy.common.SerNumEnable);
+
+                        ee232r.UseExtOsc = Convert.ToBoolean(eeLegacy.UseExtOsc);
+                        ee232r.HighDriveIOs = Convert.ToBoolean(eeLegacy.HighDriveIOs);
+                        ee232r.EndpointSize = eeLegacy.EndpointSize;
+                        ee232r.InvertTXD = Convert.ToBoolean(eeLegacy.InvertTXD);
+                        ee232r.InvertRXD = Convert.ToBoolean(eeLegacy.InvertRXD);
+                        ee232r.InvertRTS = Convert.ToBoolean(eeLegacy.InvertRTS);
+                        ee232r.InvertCTS = Convert.ToBoolean(eeLegacy.InvertCTS);
+                        ee232r.InvertDTR = Convert.ToBoolean(eeLegacy.InvertDTR);
+                        ee232r.InvertDSR = Convert.ToBoolean(eeLegacy.InvertDSR);
+                        ee232r.InvertDCD = Convert.ToBoolean(eeLegacy.InvertDCD);
+                        ee232r.InvertRI = Convert.ToBoolean(eeLegacy.InvertRI);
+                        ee232r.Cbus0 = eeLegacy.Cbus0;
+                        ee232r.Cbus1 = eeLegacy.Cbus1;
+                        ee232r.Cbus2 = eeLegacy.Cbus2;
+                        ee232r.Cbus3 = eeLegacy.Cbus3;
+                        ee232r.Cbus4 = eeLegacy.Cbus4;
+                        ee232r.RIsD2XX = Convert.ToBoolean(eeLegacy.RIsD2XX);
                     }
-
-                    FT_PROGRAM_DATA eedata = new FT_PROGRAM_DATA();
-
-                    // Set up structure headers
-                    eedata.Signature1 = 0x00000000;
-                    eedata.Signature2 = 0xFFFFFFFF;
-                    eedata.Version = 2;
-
-                    // Allocate space from unmanaged heap
-                    eedata.Manufacturer = Marshal.AllocHGlobal(32);
-                    eedata.ManufacturerID = Marshal.AllocHGlobal(16);
-                    eedata.Description = Marshal.AllocHGlobal(64);
-                    eedata.SerialNumber = Marshal.AllocHGlobal(16);
-
-                    // Call FT_EE_Read
-                    ftStatus = FT_EE_Read(ftHandle, eedata);
-
-                    // Retrieve string values
-                    ee232r.Manufacturer = Marshal.PtrToStringAnsi(eedata.Manufacturer);
-                    ee232r.ManufacturerID = Marshal.PtrToStringAnsi(eedata.ManufacturerID);
-                    ee232r.Description = Marshal.PtrToStringAnsi(eedata.Description);
-                    ee232r.SerialNumber = Marshal.PtrToStringAnsi(eedata.SerialNumber);
-
-                    // Free unmanaged buffers
-                    Marshal.FreeHGlobal(eedata.Manufacturer);
-                    Marshal.FreeHGlobal(eedata.ManufacturerID);
-                    Marshal.FreeHGlobal(eedata.Description);
-                    Marshal.FreeHGlobal(eedata.SerialNumber);
-
-                    // Map non-string elements to structure to be returned
-                    // Standard elements
-                    ee232r.VendorID = eedata.VendorID;
-                    ee232r.ProductID = eedata.ProductID;
-                    ee232r.MaxPower = eedata.MaxPower;
-                    ee232r.SelfPowered = Convert.ToBoolean(eedata.SelfPowered);
-                    ee232r.RemoteWakeup = Convert.ToBoolean(eedata.RemoteWakeup);
-                    // 232R specific fields
-                    ee232r.UseExtOsc = Convert.ToBoolean(eedata.UseExtOsc);
-                    ee232r.HighDriveIOs = Convert.ToBoolean(eedata.HighDriveIOs);
-                    ee232r.EndpointSize = eedata.EndpointSize;
-                    ee232r.PullDownEnable = Convert.ToBoolean(eedata.PullDownEnableR);
-                    ee232r.SerNumEnable = Convert.ToBoolean(eedata.SerNumEnableR);
-                    ee232r.InvertTXD = Convert.ToBoolean(eedata.InvertTXD);
-                    ee232r.InvertRXD = Convert.ToBoolean(eedata.InvertRXD);
-                    ee232r.InvertRTS = Convert.ToBoolean(eedata.InvertRTS);
-                    ee232r.InvertCTS = Convert.ToBoolean(eedata.InvertCTS);
-                    ee232r.InvertDTR = Convert.ToBoolean(eedata.InvertDTR);
-                    ee232r.InvertDSR = Convert.ToBoolean(eedata.InvertDSR);
-                    ee232r.InvertDCD = Convert.ToBoolean(eedata.InvertDCD);
-                    ee232r.InvertRI = Convert.ToBoolean(eedata.InvertRI);
-                    ee232r.Cbus0 = eedata.Cbus0;
-                    ee232r.Cbus1 = eedata.Cbus1;
-                    ee232r.Cbus2 = eedata.Cbus2;
-                    ee232r.Cbus3 = eedata.Cbus3;
-                    ee232r.Cbus4 = eedata.Cbus4;
-                    ee232r.RIsD2XX = Convert.ToBoolean(eedata.RIsD2XX);
                 }
-            }
-            else
-            {
-                if (pFT_EE_Read == IntPtr.Zero)
+                finally
                 {
-                    Console.WriteLine("Failed to load function FT_EE_Read.");
+                    Marshal.FreeHGlobal(eeLegacyMarshal);
                 }
             }
+
             return ftStatus;
         }
 
         //**************************************************************************
-        // ReadFT2232HEEPROM
+        // ReadFT2232HEEPROM_Legacy
         //**************************************************************************
         // Intellisense comments
         /// <summary>
-        /// Reads the EEPROM contents of an FT2232H device.
+        /// Reads the EEPROM contents of an FT2232H device using the legacy FT_EE_Read API.
         /// </summary>
         /// <returns>FT_STATUS value from FT_EE_Read in FTD2XX DLL</returns>
         /// <param name="ee2232h">An FT2232H_EEPROM_STRUCTURE which contains only the relevant information for an FT2232H device.</param>
         /// <exception cref="FT_EXCEPTION">Thrown when the current device does not match the type required by this method.</exception>
-        public FT_STATUS ReadFT2232HEEPROM(FT2232H_EEPROM_STRUCTURE ee2232h)
+        private FT_STATUS ReadFT2232HEEPROM_Legacy(FT2232H_EEPROM_STRUCTURE ee2232h)
         {
             // Initialise ftStatus to something other than FT_OK
             FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
             FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
 
+            // Validate parameter
+            if (ee2232h == null)
+                return ftStatus;
+
             // If the DLL hasn't been loaded, just return here
             if (hFTD2XXDLL == IntPtr.Zero)
                 return ftStatus;
 
-            // Check for our required function pointers being set up
-            if (pFT_EE_Read != IntPtr.Zero)
+            if (ftHandle != IntPtr.Zero)
             {
-                tFT_EE_Read FT_EE_Read = (tFT_EE_Read)Marshal.GetDelegateForFunctionPointer(pFT_EE_Read, typeof(tFT_EE_Read));
-
-                if (ftHandle != IntPtr.Zero)
-                {
-                    FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
-                    // Check that it is an FT2232H that we are trying to read
-                    GetDeviceType(ref DeviceType);
+                FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
+                // Check that it is an FT2232H that we are trying to read
+                GetDeviceType(ref DeviceType);
                     if (DeviceType != FT_DEVICE.FT_DEVICE_2232H)
-                    {
-                        // If it is not, throw an exception
-                        ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
-                        ErrorHandler(ftStatus, ftErrorCondition);
-                    }
+	                {
+	                    // If it is not, throw an exception
+	                    ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
+	                    ErrorHandler(ftStatus, ftErrorCondition);
+	                }
+
+                // Legacy FT_EE_Read implementation used as a fallback when FT_EEPROM_Read is not available.
+                if (pFT_EE_Read != IntPtr.Zero)
+                {
+                    tFT_EE_Read FT_EE_Read = (tFT_EE_Read)Marshal.GetDelegateForFunctionPointer(pFT_EE_Read, typeof(tFT_EE_Read));
 
                     FT_PROGRAM_DATA eedata = new FT_PROGRAM_DATA();
 
@@ -3784,100 +4294,230 @@ namespace FTD2XX_NET
                     eedata.Description = Marshal.AllocHGlobal(64);
                     eedata.SerialNumber = Marshal.AllocHGlobal(16);
 
-                    // Call FT_EE_Read
-                    ftStatus = FT_EE_Read(ftHandle, eedata);
+                    try
+                    {
+                        // Call FT_EE_Read
+                        ftStatus = FT_EE_Read(ftHandle, eedata);
 
-                    // Retrieve string values
-                    ee2232h.Manufacturer = Marshal.PtrToStringAnsi(eedata.Manufacturer);
-                    ee2232h.ManufacturerID = Marshal.PtrToStringAnsi(eedata.ManufacturerID);
-                    ee2232h.Description = Marshal.PtrToStringAnsi(eedata.Description);
-                    ee2232h.SerialNumber = Marshal.PtrToStringAnsi(eedata.SerialNumber);
+                        if (ftStatus == FT_STATUS.FT_OK)
+                        {
+                            // Retrieve string values
+                            ee2232h.Manufacturer = Marshal.PtrToStringAnsi(eedata.Manufacturer);
+                            ee2232h.ManufacturerID = Marshal.PtrToStringAnsi(eedata.ManufacturerID);
+                            ee2232h.Description = Marshal.PtrToStringAnsi(eedata.Description);
+                            ee2232h.SerialNumber = Marshal.PtrToStringAnsi(eedata.SerialNumber);
 
-                    // Free unmanaged buffers
-                    Marshal.FreeHGlobal(eedata.Manufacturer);
-                    Marshal.FreeHGlobal(eedata.ManufacturerID);
-                    Marshal.FreeHGlobal(eedata.Description);
-                    Marshal.FreeHGlobal(eedata.SerialNumber);
-
-                    // Map non-string elements to structure to be returned
-                    // Standard elements
-                    ee2232h.VendorID = eedata.VendorID;
-                    ee2232h.ProductID = eedata.ProductID;
-                    ee2232h.MaxPower = eedata.MaxPower;
-                    ee2232h.SelfPowered = Convert.ToBoolean(eedata.SelfPowered);
-                    ee2232h.RemoteWakeup = Convert.ToBoolean(eedata.RemoteWakeup);
-                    // 2232H specific fields
-                    ee2232h.PullDownEnable = Convert.ToBoolean(eedata.PullDownEnable7);
-                    ee2232h.SerNumEnable = Convert.ToBoolean(eedata.SerNumEnable7);
-                    ee2232h.ALSlowSlew = Convert.ToBoolean(eedata.ALSlowSlew);
-                    ee2232h.ALSchmittInput = Convert.ToBoolean(eedata.ALSchmittInput);
-                    ee2232h.ALDriveCurrent = eedata.ALDriveCurrent;
-                    ee2232h.AHSlowSlew = Convert.ToBoolean(eedata.AHSlowSlew);
-                    ee2232h.AHSchmittInput = Convert.ToBoolean(eedata.AHSchmittInput);
-                    ee2232h.AHDriveCurrent = eedata.AHDriveCurrent;
-                    ee2232h.BLSlowSlew = Convert.ToBoolean(eedata.BLSlowSlew);
-                    ee2232h.BLSchmittInput = Convert.ToBoolean(eedata.BLSchmittInput);
-                    ee2232h.BLDriveCurrent = eedata.BLDriveCurrent;
-                    ee2232h.BHSlowSlew = Convert.ToBoolean(eedata.BHSlowSlew);
-                    ee2232h.BHSchmittInput = Convert.ToBoolean(eedata.BHSchmittInput);
-                    ee2232h.BHDriveCurrent = eedata.BHDriveCurrent;
-                    ee2232h.IFAIsFifo = Convert.ToBoolean(eedata.IFAIsFifo7);
-                    ee2232h.IFAIsFifoTar = Convert.ToBoolean(eedata.IFAIsFifoTar7);
-                    ee2232h.IFAIsFastSer = Convert.ToBoolean(eedata.IFAIsFastSer7);
-                    ee2232h.AIsVCP = Convert.ToBoolean(eedata.AIsVCP7);
-                    ee2232h.IFBIsFifo = Convert.ToBoolean(eedata.IFBIsFifo7);
-                    ee2232h.IFBIsFifoTar = Convert.ToBoolean(eedata.IFBIsFifoTar7);
-                    ee2232h.IFBIsFastSer = Convert.ToBoolean(eedata.IFBIsFastSer7);
-                    ee2232h.BIsVCP = Convert.ToBoolean(eedata.BIsVCP7);
-                    ee2232h.PowerSaveEnable = Convert.ToBoolean(eedata.PowerSaveEnable);
+                            // Map non-string elements to structure to be returned
+                            // Standard elements
+                            ee2232h.VendorID = eedata.VendorID;
+                            ee2232h.ProductID = eedata.ProductID;
+                            ee2232h.MaxPower = eedata.MaxPower;
+                            ee2232h.SelfPowered = Convert.ToBoolean(eedata.SelfPowered);
+                            ee2232h.RemoteWakeup = Convert.ToBoolean(eedata.RemoteWakeup);
+                            // 2232H specific fields
+                            ee2232h.PullDownEnable = Convert.ToBoolean(eedata.PullDownEnable7);
+                            ee2232h.SerNumEnable = Convert.ToBoolean(eedata.SerNumEnable7);
+                            ee2232h.ALSlowSlew = Convert.ToBoolean(eedata.ALSlowSlew);
+                            ee2232h.ALSchmittInput = Convert.ToBoolean(eedata.ALSchmittInput);
+                            ee2232h.ALDriveCurrent = eedata.ALDriveCurrent;
+                            ee2232h.AHSlowSlew = Convert.ToBoolean(eedata.AHSlowSlew);
+                            ee2232h.AHSchmittInput = Convert.ToBoolean(eedata.AHSchmittInput);
+                            ee2232h.AHDriveCurrent = eedata.AHDriveCurrent;
+                            ee2232h.BLSlowSlew = Convert.ToBoolean(eedata.BLSlowSlew);
+                            ee2232h.BLSchmittInput = Convert.ToBoolean(eedata.BLSchmittInput);
+                            ee2232h.BLDriveCurrent = eedata.BLDriveCurrent;
+                            ee2232h.BHSlowSlew = Convert.ToBoolean(eedata.BHSlowSlew);
+                            ee2232h.BHSchmittInput = Convert.ToBoolean(eedata.BHSchmittInput);
+                            ee2232h.BHDriveCurrent = eedata.BHDriveCurrent;
+                            ee2232h.IFAIsFifo = Convert.ToBoolean(eedata.IFAIsFifo7);
+                            ee2232h.IFAIsFifoTar = Convert.ToBoolean(eedata.IFAIsFifoTar7);
+                            ee2232h.IFAIsFastSer = Convert.ToBoolean(eedata.IFAIsFastSer7);
+                            ee2232h.AIsVCP = Convert.ToBoolean(eedata.AIsVCP7);
+                            ee2232h.IFBIsFifo = Convert.ToBoolean(eedata.IFBIsFifo7);
+                            ee2232h.IFBIsFifoTar = Convert.ToBoolean(eedata.IFBIsFifoTar7);
+                            ee2232h.IFBIsFastSer = Convert.ToBoolean(eedata.IFBIsFastSer7);
+                            ee2232h.BIsVCP = Convert.ToBoolean(eedata.BIsVCP7);
+                            ee2232h.PowerSaveEnable = Convert.ToBoolean(eedata.PowerSaveEnable);
+                        }
+                    }
+                    finally
+                    {
+                        // Free unmanaged buffers
+                        Marshal.FreeHGlobal(eedata.Manufacturer);
+                        Marshal.FreeHGlobal(eedata.ManufacturerID);
+                        Marshal.FreeHGlobal(eedata.Description);
+                        Marshal.FreeHGlobal(eedata.SerialNumber);
+                    }
                 }
-            }
-            else
-            {
-                if (pFT_EE_Read == IntPtr.Zero)
+                else if (pFT_EEPROM_Read != IntPtr.Zero)
                 {
-                    Console.WriteLine("Failed to load function FT_EE_Read.");
+                    // FT_EEPROM_Read is available but this is the legacy method; caller should use ReadFT2232HEEPROM.
+                    return ftStatus;
+                }
+                else
+                {
+                    Console.WriteLine("Failed to load function FT_EEPROM_Read or FT_EE_Read.");
                 }
             }
             return ftStatus;
         }
 
         //**************************************************************************
-        // ReadFT4232HEEPROM
+        // ReadFT2232HEEPROM
         //**************************************************************************
         // Intellisense comments
         /// <summary>
-        /// Reads the EEPROM contents of an FT4232H device.
+        /// Reads the EEPROM contents of an FT2232H device using the FT_EEPROM_Read API.
+        /// Falls back to the legacy FT_EE_Read API when FT_EEPROM_Read is not available.
+        /// </summary>
+        /// <returns>FT_STATUS value from the underlying EEPROM API</returns>
+        /// <param name="ee2232h">An FT2232H_EEPROM_STRUCTURE which contains only the relevant information for an FT2232H device.</param>
+        /// <exception cref="FT_EXCEPTION">Thrown when the current device does not match the type required by this method.</exception>
+        public FT_STATUS ReadFT2232HEEPROM(FT2232H_EEPROM_STRUCTURE ee2232h)
+        {
+            FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
+            FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
+
+            if (ee2232h == null)
+                return ftStatus;
+
+            if (hFTD2XXDLL == IntPtr.Zero)
+                return ftStatus;
+
+            if (ftHandle == IntPtr.Zero)
+                return ftStatus;
+
+            FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
+            GetDeviceType(ref DeviceType);
+            if ((DeviceType != FT_DEVICE.FT_DEVICE_2232H)
+                && (DeviceType != FT_DEVICE.FT_DEVICE_2232HP)
+                && (DeviceType != FT_DEVICE.FT_DEVICE_2232HA))
+            {
+                ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
+                ErrorHandler(ftStatus, ftErrorCondition);
+            }
+
+            if (pFT_EEPROM_Read == IntPtr.Zero)
+            {
+                if (pFT_EE_Read != IntPtr.Zero)
+                    return ReadFT2232HEEPROM_Legacy(ee2232h);
+
+                return ftStatus;
+            }
+
+            tFT_EEPROM_Read FT_EEPROM_Read = (tFT_EEPROM_Read)Marshal.GetDelegateForFunctionPointer(pFT_EEPROM_Read, typeof(tFT_EEPROM_Read));
+
+            FT_2232H_DATA eeData = new FT_2232H_DATA();
+            FT_EEPROM_HEADER eeHeader = new FT_EEPROM_HEADER();
+
+            byte[] manufacturer = new byte[32];
+            byte[] manufacturerID = new byte[16];
+            byte[] description = new byte[64];
+            byte[] serialNumber = new byte[16];
+
+            eeHeader.deviceType = (uint)DeviceType;
+            eeData.common = eeHeader;
+
+            int size = Marshal.SizeOf(eeData);
+            IntPtr eeDataMarshal = Marshal.AllocHGlobal(size);
+
+            try
+            {
+                Marshal.StructureToPtr(eeData, eeDataMarshal, false);
+
+                ftStatus = FT_EEPROM_Read(ftHandle, eeDataMarshal, (uint)size, manufacturer, manufacturerID, description, serialNumber);
+
+                if (ftStatus == FT_STATUS.FT_OK)
+                {
+                    eeData = (FT_2232H_DATA)Marshal.PtrToStructure(eeDataMarshal, typeof(FT_2232H_DATA));
+
+                    ee2232h.Manufacturer = DecodeNullTerminatedUtf8(manufacturer);
+                    ee2232h.ManufacturerID = DecodeNullTerminatedUtf8(manufacturerID);
+                    ee2232h.Description = DecodeNullTerminatedUtf8(description);
+                    ee2232h.SerialNumber = DecodeNullTerminatedUtf8(serialNumber);
+
+                    ee2232h.VendorID = eeData.common.VendorId;
+                    ee2232h.ProductID = eeData.common.ProductId;
+                    ee2232h.MaxPower = eeData.common.MaxPower;
+                    ee2232h.SelfPowered = Convert.ToBoolean(eeData.common.SelfPowered);
+                    ee2232h.RemoteWakeup = Convert.ToBoolean(eeData.common.RemoteWakeup);
+
+                    ee2232h.PullDownEnable = Convert.ToBoolean(eeData.common.PullDownEnable);
+                    ee2232h.SerNumEnable = Convert.ToBoolean(eeData.common.SerNumEnable);
+                    ee2232h.ALSlowSlew = Convert.ToBoolean(eeData.ALSlowSlew);
+                    ee2232h.ALSchmittInput = Convert.ToBoolean(eeData.ALSchmittInput);
+                    ee2232h.ALDriveCurrent = eeData.ALDriveCurrent;
+                    ee2232h.AHSlowSlew = Convert.ToBoolean(eeData.AHSlowSlew);
+                    ee2232h.AHSchmittInput = Convert.ToBoolean(eeData.AHSchmittInput);
+                    ee2232h.AHDriveCurrent = eeData.AHDriveCurrent;
+                    ee2232h.BLSlowSlew = Convert.ToBoolean(eeData.BLSlowSlew);
+                    ee2232h.BLSchmittInput = Convert.ToBoolean(eeData.BLSchmittInput);
+                    ee2232h.BLDriveCurrent = eeData.BLDriveCurrent;
+                    ee2232h.BHSlowSlew = Convert.ToBoolean(eeData.BHSlowSlew);
+                    ee2232h.BHSchmittInput = Convert.ToBoolean(eeData.BHSchmittInput);
+                    ee2232h.BHDriveCurrent = eeData.BHDriveCurrent;
+
+                    ee2232h.IFAIsFifo = Convert.ToBoolean(eeData.AIsFifo);
+                    ee2232h.IFAIsFifoTar = Convert.ToBoolean(eeData.AIsFifoTar);
+                    ee2232h.IFAIsFastSer = Convert.ToBoolean(eeData.AIsFastSer);
+                    ee2232h.AIsVCP = (eeData.ADriverType == FT_DRIVER_TYPE_VCP);
+
+                    ee2232h.IFBIsFifo = Convert.ToBoolean(eeData.BIsFifo);
+                    ee2232h.IFBIsFifoTar = Convert.ToBoolean(eeData.BIsFifoTar);
+                    ee2232h.IFBIsFastSer = Convert.ToBoolean(eeData.BIsFastSer);
+                    ee2232h.BIsVCP = (eeData.BDriverType == FT_DRIVER_TYPE_VCP);
+
+                    ee2232h.PowerSaveEnable = Convert.ToBoolean(eeData.PowerSaveEnable);
+                }
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(eeDataMarshal);
+            }
+
+            return ftStatus;
+        }
+
+        //**************************************************************************
+        // ReadFT4232HEEPROM_Legacy
+        //**************************************************************************
+        // Intellisense comments
+        /// <summary>
+        /// Reads the EEPROM contents of an FT4232H device using the legacy FT_EE_Read API.
         /// </summary>
         /// <returns>FT_STATUS value from FT_EE_Read in FTD2XX DLL</returns>
         /// <param name="ee4232h">An FT4232H_EEPROM_STRUCTURE which contains only the relevant information for an FT4232H device.</param>
         /// <exception cref="FT_EXCEPTION">Thrown when the current device does not match the type required by this method.</exception>
-        public FT_STATUS ReadFT4232HEEPROM(FT4232H_EEPROM_STRUCTURE ee4232h)
+        private FT_STATUS ReadFT4232HEEPROM_Legacy(FT4232H_EEPROM_STRUCTURE ee4232h)
         {
             // Initialise ftStatus to something other than FT_OK
             FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
             FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
 
+            // Validate parameter
+            if (ee4232h == null)
+                return ftStatus;
+
             // If the DLL hasn't been loaded, just return here
             if (hFTD2XXDLL == IntPtr.Zero)
                 return ftStatus;
 
-            // Check for our required function pointers being set up
-            if (pFT_EE_Read != IntPtr.Zero)
+            if (ftHandle != IntPtr.Zero)
             {
-                tFT_EE_Read FT_EE_Read = (tFT_EE_Read)Marshal.GetDelegateForFunctionPointer(pFT_EE_Read, typeof(tFT_EE_Read));
-
-                if (ftHandle != IntPtr.Zero)
-                {
-                    FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
-                    // Check that it is an FT4232H that we are trying to read
-                    GetDeviceType(ref DeviceType);
+                FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
+                // Check that it is an FT4232H that we are trying to read
+                GetDeviceType(ref DeviceType);
                     if (DeviceType != FT_DEVICE.FT_DEVICE_4232H)
-                    {
-                        // If it is not, throw an exception
-                        ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
-                        ErrorHandler(ftStatus, ftErrorCondition);
-                    }
+	                {
+	                    // If it is not, throw an exception
+	                    ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
+	                    ErrorHandler(ftStatus, ftErrorCondition);
+	                }
+
+                // Legacy FT_EE_Read implementation used as a fallback when FT_EEPROM_Read is not available.
+                if (pFT_EE_Read != IntPtr.Zero)
+                {
+                    tFT_EE_Read FT_EE_Read = (tFT_EE_Read)Marshal.GetDelegateForFunctionPointer(pFT_EE_Read, typeof(tFT_EE_Read));
 
                     FT_PROGRAM_DATA eedata = new FT_PROGRAM_DATA();
 
@@ -3892,101 +4532,227 @@ namespace FTD2XX_NET
                     eedata.Description = Marshal.AllocHGlobal(64);
                     eedata.SerialNumber = Marshal.AllocHGlobal(16);
 
-                    // Call FT_EE_Read
-                    ftStatus = FT_EE_Read(ftHandle, eedata);
+                    try
+                    {
+                        // Call FT_EE_Read
+                        ftStatus = FT_EE_Read(ftHandle, eedata);
 
-                    // Retrieve string values
-                    ee4232h.Manufacturer = Marshal.PtrToStringAnsi(eedata.Manufacturer);
-                    ee4232h.ManufacturerID = Marshal.PtrToStringAnsi(eedata.ManufacturerID);
-                    ee4232h.Description = Marshal.PtrToStringAnsi(eedata.Description);
-                    ee4232h.SerialNumber = Marshal.PtrToStringAnsi(eedata.SerialNumber);
+                        if (ftStatus == FT_STATUS.FT_OK)
+                        {
+                            // Retrieve string values
+                            ee4232h.Manufacturer = Marshal.PtrToStringAnsi(eedata.Manufacturer);
+                            ee4232h.ManufacturerID = Marshal.PtrToStringAnsi(eedata.ManufacturerID);
+                            ee4232h.Description = Marshal.PtrToStringAnsi(eedata.Description);
+                            ee4232h.SerialNumber = Marshal.PtrToStringAnsi(eedata.SerialNumber);
 
-                    // Free unmanaged buffers
-                    Marshal.FreeHGlobal(eedata.Manufacturer);
-                    Marshal.FreeHGlobal(eedata.ManufacturerID);
-                    Marshal.FreeHGlobal(eedata.Description);
-                    Marshal.FreeHGlobal(eedata.SerialNumber);
-
-                    // Map non-string elements to structure to be returned
-                    // Standard elements
-                    ee4232h.VendorID = eedata.VendorID;
-                    ee4232h.ProductID = eedata.ProductID;
-                    ee4232h.MaxPower = eedata.MaxPower;
-                    ee4232h.SelfPowered = Convert.ToBoolean(eedata.SelfPowered);
-                    ee4232h.RemoteWakeup = Convert.ToBoolean(eedata.RemoteWakeup);
-                    // 4232H specific fields
-                    ee4232h.PullDownEnable = Convert.ToBoolean(eedata.PullDownEnable8);
-                    ee4232h.SerNumEnable = Convert.ToBoolean(eedata.SerNumEnable8);
-                    ee4232h.ASlowSlew = Convert.ToBoolean(eedata.ASlowSlew);
-                    ee4232h.ASchmittInput = Convert.ToBoolean(eedata.ASchmittInput);
-                    ee4232h.ADriveCurrent = eedata.ADriveCurrent;
-                    ee4232h.BSlowSlew = Convert.ToBoolean(eedata.BSlowSlew);
-                    ee4232h.BSchmittInput = Convert.ToBoolean(eedata.BSchmittInput);
-                    ee4232h.BDriveCurrent = eedata.BDriveCurrent;
-                    ee4232h.CSlowSlew = Convert.ToBoolean(eedata.CSlowSlew);
-                    ee4232h.CSchmittInput = Convert.ToBoolean(eedata.CSchmittInput);
-                    ee4232h.CDriveCurrent = eedata.CDriveCurrent;
-                    ee4232h.DSlowSlew = Convert.ToBoolean(eedata.DSlowSlew);
-                    ee4232h.DSchmittInput = Convert.ToBoolean(eedata.DSchmittInput);
-                    ee4232h.DDriveCurrent = eedata.DDriveCurrent;
-                    ee4232h.ARIIsTXDEN = Convert.ToBoolean(eedata.ARIIsTXDEN);
-                    ee4232h.BRIIsTXDEN = Convert.ToBoolean(eedata.BRIIsTXDEN);
-                    ee4232h.CRIIsTXDEN = Convert.ToBoolean(eedata.CRIIsTXDEN);
-                    ee4232h.DRIIsTXDEN = Convert.ToBoolean(eedata.DRIIsTXDEN);
-                    ee4232h.AIsVCP = Convert.ToBoolean(eedata.AIsVCP8);
-                    ee4232h.BIsVCP = Convert.ToBoolean(eedata.BIsVCP8);
-                    ee4232h.CIsVCP = Convert.ToBoolean(eedata.CIsVCP8);
-                    ee4232h.DIsVCP = Convert.ToBoolean(eedata.DIsVCP8);
+                            // Map non-string elements to structure to be returned
+                            // Standard elements
+                            ee4232h.VendorID = eedata.VendorID;
+                            ee4232h.ProductID = eedata.ProductID;
+                            ee4232h.MaxPower = eedata.MaxPower;
+                            ee4232h.SelfPowered = Convert.ToBoolean(eedata.SelfPowered);
+                            ee4232h.RemoteWakeup = Convert.ToBoolean(eedata.RemoteWakeup);
+                            // 4232H specific fields
+                            ee4232h.PullDownEnable = Convert.ToBoolean(eedata.PullDownEnable8);
+                            ee4232h.SerNumEnable = Convert.ToBoolean(eedata.SerNumEnable8);
+                            ee4232h.ASlowSlew = Convert.ToBoolean(eedata.ASlowSlew);
+                            ee4232h.ASchmittInput = Convert.ToBoolean(eedata.ASchmittInput);
+                            ee4232h.ADriveCurrent = eedata.ADriveCurrent;
+                            ee4232h.BSlowSlew = Convert.ToBoolean(eedata.BSlowSlew);
+                            ee4232h.BSchmittInput = Convert.ToBoolean(eedata.BSchmittInput);
+                            ee4232h.BDriveCurrent = eedata.BDriveCurrent;
+                            ee4232h.CSlowSlew = Convert.ToBoolean(eedata.CSlowSlew);
+                            ee4232h.CSchmittInput = Convert.ToBoolean(eedata.CSchmittInput);
+                            ee4232h.CDriveCurrent = eedata.CDriveCurrent;
+                            ee4232h.DSlowSlew = Convert.ToBoolean(eedata.DSlowSlew);
+                            ee4232h.DSchmittInput = Convert.ToBoolean(eedata.DSchmittInput);
+                            ee4232h.DDriveCurrent = eedata.DDriveCurrent;
+                            ee4232h.ARIIsTXDEN = Convert.ToBoolean(eedata.ARIIsTXDEN);
+                            ee4232h.BRIIsTXDEN = Convert.ToBoolean(eedata.BRIIsTXDEN);
+                            ee4232h.CRIIsTXDEN = Convert.ToBoolean(eedata.CRIIsTXDEN);
+                            ee4232h.DRIIsTXDEN = Convert.ToBoolean(eedata.DRIIsTXDEN);
+                            ee4232h.AIsVCP = Convert.ToBoolean(eedata.AIsVCP8);
+                            ee4232h.BIsVCP = Convert.ToBoolean(eedata.BIsVCP8);
+                            ee4232h.CIsVCP = Convert.ToBoolean(eedata.CIsVCP8);
+                            ee4232h.DIsVCP = Convert.ToBoolean(eedata.DIsVCP8);
+                        }
+                    }
+                    finally
+                    {
+                        // Free unmanaged buffers
+                        Marshal.FreeHGlobal(eedata.Manufacturer);
+                        Marshal.FreeHGlobal(eedata.ManufacturerID);
+                        Marshal.FreeHGlobal(eedata.Description);
+                        Marshal.FreeHGlobal(eedata.SerialNumber);
+                    }
                 }
-            }
-            else
-            {
-                if (pFT_EE_Read == IntPtr.Zero)
+                else if (pFT_EEPROM_Read != IntPtr.Zero)
                 {
-                    Console.WriteLine("Failed to load function FT_EE_Read.");
+                    // FT_EEPROM_Read is available but this is the legacy method; caller should use ReadFT4232HEEPROM.
+                    return ftStatus;
+                }
+                else
+                {
+                    Console.WriteLine("Failed to load function FT_EEPROM_Read or FT_EE_Read.");
                 }
             }
             return ftStatus;
         }
 
         //**************************************************************************
-        // ReadFT232HEEPROM
+        // ReadFT4232HEEPROM
         //**************************************************************************
         // Intellisense comments
         /// <summary>
-        /// Reads the EEPROM contents of an FT232H device.
+        /// Reads the EEPROM contents of an FT4232H device using the FT_EEPROM_Read API.
+        /// Falls back to the legacy FT_EE_Read API when FT_EEPROM_Read is not available.
+        /// </summary>
+        /// <returns>FT_STATUS value from the underlying EEPROM API</returns>
+        /// <param name="ee4232h">An FT4232H_EEPROM_STRUCTURE which contains only the relevant information for an FT4232H device.</param>
+        /// <exception cref="FT_EXCEPTION">Thrown when the current device does not match the type required by this method.</exception>
+        public FT_STATUS ReadFT4232HEEPROM(FT4232H_EEPROM_STRUCTURE ee4232h)
+        {
+            FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
+            FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
+
+            if (ee4232h == null)
+                return ftStatus;
+
+            if (hFTD2XXDLL == IntPtr.Zero)
+                return ftStatus;
+
+            if (ftHandle == IntPtr.Zero)
+                return ftStatus;
+
+            FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
+            GetDeviceType(ref DeviceType);
+            if ((DeviceType != FT_DEVICE.FT_DEVICE_4232H)
+                && (DeviceType != FT_DEVICE.FT_DEVICE_4232HP)
+                && (DeviceType != FT_DEVICE.FT_DEVICE_4232HA))
+            {
+                ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
+                ErrorHandler(ftStatus, ftErrorCondition);
+            }
+
+            if (pFT_EEPROM_Read == IntPtr.Zero)
+            {
+                if (pFT_EE_Read != IntPtr.Zero)
+                    return ReadFT4232HEEPROM_Legacy(ee4232h);
+
+                return ftStatus;
+            }
+
+            tFT_EEPROM_Read FT_EEPROM_Read = (tFT_EEPROM_Read)Marshal.GetDelegateForFunctionPointer(pFT_EEPROM_Read, typeof(tFT_EEPROM_Read));
+
+            FT_4232H_DATA eeData = new FT_4232H_DATA();
+            FT_EEPROM_HEADER eeHeader = new FT_EEPROM_HEADER();
+
+            byte[] manufacturer = new byte[32];
+            byte[] manufacturerID = new byte[16];
+            byte[] description = new byte[64];
+            byte[] serialNumber = new byte[16];
+
+            eeHeader.deviceType = (uint)DeviceType;
+            eeData.common = eeHeader;
+
+            int size = Marshal.SizeOf(eeData);
+            IntPtr eeDataMarshal = Marshal.AllocHGlobal(size);
+
+            try
+            {
+                Marshal.StructureToPtr(eeData, eeDataMarshal, false);
+
+                ftStatus = FT_EEPROM_Read(ftHandle, eeDataMarshal, (uint)size, manufacturer, manufacturerID, description, serialNumber);
+
+                if (ftStatus == FT_STATUS.FT_OK)
+                {
+                    eeData = (FT_4232H_DATA)Marshal.PtrToStructure(eeDataMarshal, typeof(FT_4232H_DATA));
+
+                    ee4232h.Manufacturer = DecodeNullTerminatedUtf8(manufacturer);
+                    ee4232h.ManufacturerID = DecodeNullTerminatedUtf8(manufacturerID);
+                    ee4232h.Description = DecodeNullTerminatedUtf8(description);
+                    ee4232h.SerialNumber = DecodeNullTerminatedUtf8(serialNumber);
+
+                    ee4232h.VendorID = eeData.common.VendorId;
+                    ee4232h.ProductID = eeData.common.ProductId;
+                    ee4232h.MaxPower = eeData.common.MaxPower;
+                    ee4232h.SelfPowered = Convert.ToBoolean(eeData.common.SelfPowered);
+                    ee4232h.RemoteWakeup = Convert.ToBoolean(eeData.common.RemoteWakeup);
+
+                    ee4232h.PullDownEnable = Convert.ToBoolean(eeData.common.PullDownEnable);
+                    ee4232h.SerNumEnable = Convert.ToBoolean(eeData.common.SerNumEnable);
+                    ee4232h.ASlowSlew = Convert.ToBoolean(eeData.ASlowSlew);
+                    ee4232h.ASchmittInput = Convert.ToBoolean(eeData.ASchmittInput);
+                    ee4232h.ADriveCurrent = eeData.ADriveCurrent;
+                    ee4232h.BSlowSlew = Convert.ToBoolean(eeData.BSlowSlew);
+                    ee4232h.BSchmittInput = Convert.ToBoolean(eeData.BSchmittInput);
+                    ee4232h.BDriveCurrent = eeData.BDriveCurrent;
+                    ee4232h.CSlowSlew = Convert.ToBoolean(eeData.CSlowSlew);
+                    ee4232h.CSchmittInput = Convert.ToBoolean(eeData.CSchmittInput);
+                    ee4232h.CDriveCurrent = eeData.CDriveCurrent;
+                    ee4232h.DSlowSlew = Convert.ToBoolean(eeData.DSlowSlew);
+                    ee4232h.DSchmittInput = Convert.ToBoolean(eeData.DSchmittInput);
+                    ee4232h.DDriveCurrent = eeData.DDriveCurrent;
+                    ee4232h.ARIIsTXDEN = Convert.ToBoolean(eeData.ARIIsTXDEN);
+                    ee4232h.BRIIsTXDEN = Convert.ToBoolean(eeData.BRIIsTXDEN);
+                    ee4232h.CRIIsTXDEN = Convert.ToBoolean(eeData.CRIIsTXDEN);
+                    ee4232h.DRIIsTXDEN = Convert.ToBoolean(eeData.DRIIsTXDEN);
+                    ee4232h.AIsVCP = (eeData.ADriverType == FT_DRIVER_TYPE_VCP);
+                    ee4232h.BIsVCP = (eeData.BDriverType == FT_DRIVER_TYPE_VCP);
+                    ee4232h.CIsVCP = (eeData.CDriverType == FT_DRIVER_TYPE_VCP);
+                    ee4232h.DIsVCP = (eeData.DDriverType == FT_DRIVER_TYPE_VCP);
+                }
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(eeDataMarshal);
+            }
+
+            return ftStatus;
+        }
+
+        //**************************************************************************
+        // ReadFT232HEEPROM_Legacy
+        //**************************************************************************
+        // Intellisense comments
+        /// <summary>
+        /// Reads the EEPROM contents of an FT232H device using the legacy FT_EE_Read API.
         /// </summary>
         /// <returns>FT_STATUS value from FT_EE_Read in FTD2XX DLL</returns>
         /// <param name="ee232h">An FT232H_EEPROM_STRUCTURE which contains only the relevant information for an FT232H device.</param>
         /// <exception cref="FT_EXCEPTION">Thrown when the current device does not match the type required by this method.</exception>
-        public FT_STATUS ReadFT232HEEPROM(FT232H_EEPROM_STRUCTURE ee232h)
+        private FT_STATUS ReadFT232HEEPROM_Legacy(FT232H_EEPROM_STRUCTURE ee232h)
         {
             // Initialise ftStatus to something other than FT_OK
             FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
             FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
 
+            // Validate parameter
+            if (ee232h == null)
+                return ftStatus;
+
             // If the DLL hasn't been loaded, just return here
             if (hFTD2XXDLL == IntPtr.Zero)
                 return ftStatus;
 
-            // Check for our required function pointers being set up
-            if (pFT_EE_Read != IntPtr.Zero)
+            if (ftHandle != IntPtr.Zero)
             {
-                tFT_EE_Read FT_EE_Read = (tFT_EE_Read)Marshal.GetDelegateForFunctionPointer(pFT_EE_Read, typeof(tFT_EE_Read));
-
-                if (ftHandle != IntPtr.Zero)
+                FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
+                // Check that it is an FT232H that we are trying to read
+                GetDeviceType(ref DeviceType);
+                if ((DeviceType != FT_DEVICE.FT_DEVICE_232H)
+                    && (DeviceType != FT_DEVICE.FT_DEVICE_232HP)
+                    && (DeviceType != FT_DEVICE.FT_DEVICE_233HP))
                 {
-                    FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
-                    // Check that it is an FT232H that we are trying to read
-                    GetDeviceType(ref DeviceType);
-                    if ((DeviceType != FT_DEVICE.FT_DEVICE_232H)
-                        && (DeviceType != FT_DEVICE.FT_DEVICE_232HP)
-                        && (DeviceType != FT_DEVICE.FT_DEVICE_233HP))
-                    {
-                        // If it is not, throw an exception
-                        ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
-                        ErrorHandler(ftStatus, ftErrorCondition);
-                    }
+                    // If it is not, throw an exception
+                    ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
+                    ErrorHandler(ftStatus, ftErrorCondition);
+                }
+
+                // Legacy FT_EE_Read implementation used as a fallback when FT_EEPROM_Read is not available.
+                if (pFT_EE_Read != IntPtr.Zero)
+                {
+                    tFT_EE_Read FT_EE_Read = (tFT_EE_Read)Marshal.GetDelegateForFunctionPointer(pFT_EE_Read, typeof(tFT_EE_Read));
 
                     FT_PROGRAM_DATA eedata = new FT_PROGRAM_DATA();
 
@@ -4001,65 +4767,192 @@ namespace FTD2XX_NET
                     eedata.Description = Marshal.AllocHGlobal(64);
                     eedata.SerialNumber = Marshal.AllocHGlobal(16);
 
-                    // Call FT_EE_Read
-                    ftStatus = FT_EE_Read(ftHandle, eedata);
+                    try
+                    {
+                        // Call FT_EE_Read
+                        ftStatus = FT_EE_Read(ftHandle, eedata);
 
-                    // Retrieve string values
-                    ee232h.Manufacturer = Marshal.PtrToStringAnsi(eedata.Manufacturer);
-                    ee232h.ManufacturerID = Marshal.PtrToStringAnsi(eedata.ManufacturerID);
-                    ee232h.Description = Marshal.PtrToStringAnsi(eedata.Description);
-                    ee232h.SerialNumber = Marshal.PtrToStringAnsi(eedata.SerialNumber);
+                        if (ftStatus == FT_STATUS.FT_OK)
+                        {
+                            // Retrieve string values
+                            ee232h.Manufacturer = Marshal.PtrToStringAnsi(eedata.Manufacturer);
+                            ee232h.ManufacturerID = Marshal.PtrToStringAnsi(eedata.ManufacturerID);
+                            ee232h.Description = Marshal.PtrToStringAnsi(eedata.Description);
+                            ee232h.SerialNumber = Marshal.PtrToStringAnsi(eedata.SerialNumber);
 
-                    // Free unmanaged buffers
-                    Marshal.FreeHGlobal(eedata.Manufacturer);
-                    Marshal.FreeHGlobal(eedata.ManufacturerID);
-                    Marshal.FreeHGlobal(eedata.Description);
-                    Marshal.FreeHGlobal(eedata.SerialNumber);
-
-                    // Map non-string elements to structure to be returned
-                    // Standard elements
-                    ee232h.VendorID = eedata.VendorID;
-                    ee232h.ProductID = eedata.ProductID;
-                    ee232h.MaxPower = eedata.MaxPower;
-                    ee232h.SelfPowered = Convert.ToBoolean(eedata.SelfPowered);
-                    ee232h.RemoteWakeup = Convert.ToBoolean(eedata.RemoteWakeup);
-                    // 232H specific fields
-                    ee232h.PullDownEnable = Convert.ToBoolean(eedata.PullDownEnableH);
-                    ee232h.SerNumEnable = Convert.ToBoolean(eedata.SerNumEnableH);
-                    ee232h.ACSlowSlew = Convert.ToBoolean(eedata.ACSlowSlewH);
-                    ee232h.ACSchmittInput = Convert.ToBoolean(eedata.ACSchmittInputH);
-                    ee232h.ACDriveCurrent = eedata.ACDriveCurrentH;
-                    ee232h.ADSlowSlew = Convert.ToBoolean(eedata.ADSlowSlewH);
-                    ee232h.ADSchmittInput = Convert.ToBoolean(eedata.ADSchmittInputH);
-                    ee232h.ADDriveCurrent = eedata.ADDriveCurrentH;
-                    ee232h.Cbus0 = eedata.Cbus0H;
-                    ee232h.Cbus1 = eedata.Cbus1H;
-                    ee232h.Cbus2 = eedata.Cbus2H;
-                    ee232h.Cbus3 = eedata.Cbus3H;
-                    ee232h.Cbus4 = eedata.Cbus4H;
-                    ee232h.Cbus5 = eedata.Cbus5H;
-                    ee232h.Cbus6 = eedata.Cbus6H;
-                    ee232h.Cbus7 = eedata.Cbus7H;
-                    ee232h.Cbus8 = eedata.Cbus8H;
-                    ee232h.Cbus9 = eedata.Cbus9H;
-                    ee232h.IsFifo = Convert.ToBoolean(eedata.IsFifoH);
-                    ee232h.IsFifoTar = Convert.ToBoolean(eedata.IsFifoTarH);
-                    ee232h.IsFastSer = Convert.ToBoolean(eedata.IsFastSerH);
-                    ee232h.IsFT1248 = Convert.ToBoolean(eedata.IsFT1248H);
-                    ee232h.FT1248Cpol = Convert.ToBoolean(eedata.FT1248CpolH);
-                    ee232h.FT1248Lsb =  Convert.ToBoolean(eedata.FT1248LsbH);
-                    ee232h.FT1248FlowControl = Convert.ToBoolean(eedata.FT1248FlowControlH);
-                    ee232h.IsVCP = Convert.ToBoolean(eedata.IsVCPH);
-                    ee232h.PowerSaveEnable = Convert.ToBoolean(eedata.PowerSaveEnableH);
+                            // Map non-string elements to structure to be returned
+                            // Standard elements
+                            ee232h.VendorID = eedata.VendorID;
+                            ee232h.ProductID = eedata.ProductID;
+                            ee232h.MaxPower = eedata.MaxPower;
+                            ee232h.SelfPowered = Convert.ToBoolean(eedata.SelfPowered);
+                            ee232h.RemoteWakeup = Convert.ToBoolean(eedata.RemoteWakeup);
+                            // 232H specific fields
+                            ee232h.PullDownEnable = Convert.ToBoolean(eedata.PullDownEnableH);
+                            ee232h.SerNumEnable = Convert.ToBoolean(eedata.SerNumEnableH);
+                            ee232h.ACSlowSlew = Convert.ToBoolean(eedata.ACSlowSlewH);
+                            ee232h.ACSchmittInput = Convert.ToBoolean(eedata.ACSchmittInputH);
+                            ee232h.ACDriveCurrent = eedata.ACDriveCurrentH;
+                            ee232h.ADSlowSlew = Convert.ToBoolean(eedata.ADSlowSlewH);
+                            ee232h.ADSchmittInput = Convert.ToBoolean(eedata.ADSchmittInputH);
+                            ee232h.ADDriveCurrent = eedata.ADDriveCurrentH;
+                            ee232h.Cbus0 = eedata.Cbus0H;
+                            ee232h.Cbus1 = eedata.Cbus1H;
+                            ee232h.Cbus2 = eedata.Cbus2H;
+                            ee232h.Cbus3 = eedata.Cbus3H;
+                            ee232h.Cbus4 = eedata.Cbus4H;
+                            ee232h.Cbus5 = eedata.Cbus5H;
+                            ee232h.Cbus6 = eedata.Cbus6H;
+                            ee232h.Cbus7 = eedata.Cbus7H;
+                            ee232h.Cbus8 = eedata.Cbus8H;
+                            ee232h.Cbus9 = eedata.Cbus9H;
+                            ee232h.IsFifo = Convert.ToBoolean(eedata.IsFifoH);
+                            ee232h.IsFifoTar = Convert.ToBoolean(eedata.IsFifoTarH);
+                            ee232h.IsFastSer = Convert.ToBoolean(eedata.IsFastSerH);
+                            ee232h.IsFT1248 = Convert.ToBoolean(eedata.IsFT1248H);
+                            ee232h.FT1248Cpol = Convert.ToBoolean(eedata.FT1248CpolH);
+                            ee232h.FT1248Lsb = Convert.ToBoolean(eedata.FT1248LsbH);
+                            ee232h.FT1248FlowControl = Convert.ToBoolean(eedata.FT1248FlowControlH);
+                            ee232h.IsVCP = Convert.ToBoolean(eedata.IsVCPH);
+                            ee232h.PowerSaveEnable = Convert.ToBoolean(eedata.PowerSaveEnableH);
+                        }
+                    }
+                    finally
+                    {
+                        // Free unmanaged buffers
+                        Marshal.FreeHGlobal(eedata.Manufacturer);
+                        Marshal.FreeHGlobal(eedata.ManufacturerID);
+                        Marshal.FreeHGlobal(eedata.Description);
+                        Marshal.FreeHGlobal(eedata.SerialNumber);
+                    }
                 }
-            }
-            else
-            {
-                if (pFT_EE_Read == IntPtr.Zero)
+                else if (pFT_EEPROM_Read != IntPtr.Zero)
                 {
-                    Console.WriteLine("Failed to load function FT_EE_Read.");
+                    // FT_EEPROM_Read is available but this is the legacy method; caller should use ReadFT232HEEPROM.
+                    return ftStatus;
+                }
+                else
+                {
+                    Console.WriteLine("Failed to load function FT_EEPROM_Read or FT_EE_Read.");
                 }
             }
+            return ftStatus;
+        }
+
+        //**************************************************************************
+        // ReadFT232HEEPROM
+        //**************************************************************************
+        // Intellisense comments
+        /// <summary>
+        /// Reads the EEPROM contents of an FT232H device using the FT_EEPROM_Read API.
+        /// Falls back to the legacy FT_EE_Read API when FT_EEPROM_Read is not available.
+        /// </summary>
+        /// <returns>FT_STATUS value from the underlying EEPROM API</returns>
+        /// <param name="ee232h">An FT232H_EEPROM_STRUCTURE which contains only the relevant information for an FT232H device.</param>
+        /// <exception cref="FT_EXCEPTION">Thrown when the current device does not match the type required by this method.</exception>
+        public FT_STATUS ReadFT232HEEPROM(FT232H_EEPROM_STRUCTURE ee232h)
+        {
+            FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
+            FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
+
+            if (ee232h == null)
+                return ftStatus;
+
+            if (hFTD2XXDLL == IntPtr.Zero)
+                return ftStatus;
+
+            if (ftHandle == IntPtr.Zero)
+                return ftStatus;
+
+            FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
+            GetDeviceType(ref DeviceType);
+            if ((DeviceType != FT_DEVICE.FT_DEVICE_232H)
+                && (DeviceType != FT_DEVICE.FT_DEVICE_232HP)
+                && (DeviceType != FT_DEVICE.FT_DEVICE_233HP))
+            {
+                ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
+                ErrorHandler(ftStatus, ftErrorCondition);
+            }
+
+            if (pFT_EEPROM_Read == IntPtr.Zero)
+            {
+                if (pFT_EE_Read != IntPtr.Zero)
+                    return ReadFT232HEEPROM_Legacy(ee232h);
+
+                return ftStatus;
+            }
+
+            tFT_EEPROM_Read FT_EEPROM_Read = (tFT_EEPROM_Read)Marshal.GetDelegateForFunctionPointer(pFT_EEPROM_Read, typeof(tFT_EEPROM_Read));
+
+            FT_232H_DATA eeData = new FT_232H_DATA();
+            FT_EEPROM_HEADER eeHeader = new FT_EEPROM_HEADER();
+
+            byte[] manufacturer = new byte[32];
+            byte[] manufacturerID = new byte[16];
+            byte[] description = new byte[64];
+            byte[] serialNumber = new byte[16];
+
+            eeHeader.deviceType = (uint)DeviceType;
+            eeData.common = eeHeader;
+
+            int size = Marshal.SizeOf(eeData);
+            IntPtr eeDataMarshal = Marshal.AllocHGlobal(size);
+
+            try
+            {
+                Marshal.StructureToPtr(eeData, eeDataMarshal, false);
+
+                ftStatus = FT_EEPROM_Read(ftHandle, eeDataMarshal, (uint)size, manufacturer, manufacturerID, description, serialNumber);
+
+                if (ftStatus == FT_STATUS.FT_OK)
+                {
+                    eeData = (FT_232H_DATA)Marshal.PtrToStructure(eeDataMarshal, typeof(FT_232H_DATA));
+
+                    ee232h.Manufacturer = DecodeNullTerminatedUtf8(manufacturer);
+                    ee232h.ManufacturerID = DecodeNullTerminatedUtf8(manufacturerID);
+                    ee232h.Description = DecodeNullTerminatedUtf8(description);
+                    ee232h.SerialNumber = DecodeNullTerminatedUtf8(serialNumber);
+
+                    ee232h.VendorID = eeData.common.VendorId;
+                    ee232h.ProductID = eeData.common.ProductId;
+                    ee232h.MaxPower = eeData.common.MaxPower;
+                    ee232h.SelfPowered = Convert.ToBoolean(eeData.common.SelfPowered);
+                    ee232h.RemoteWakeup = Convert.ToBoolean(eeData.common.RemoteWakeup);
+
+                    ee232h.PullDownEnable = Convert.ToBoolean(eeData.common.PullDownEnable);
+                    ee232h.SerNumEnable = Convert.ToBoolean(eeData.common.SerNumEnable);
+                    ee232h.ACSlowSlew = Convert.ToBoolean(eeData.ACSlowSlew);
+                    ee232h.ACSchmittInput = Convert.ToBoolean(eeData.ACSchmittInput);
+                    ee232h.ACDriveCurrent = eeData.ACDriveCurrent;
+                    ee232h.ADSlowSlew = Convert.ToBoolean(eeData.ADSlowSlew);
+                    ee232h.ADSchmittInput = Convert.ToBoolean(eeData.ADSchmittInput);
+                    ee232h.ADDriveCurrent = eeData.ADDriveCurrent;
+                    ee232h.Cbus0 = eeData.Cbus0;
+                    ee232h.Cbus1 = eeData.Cbus1;
+                    ee232h.Cbus2 = eeData.Cbus2;
+                    ee232h.Cbus3 = eeData.Cbus3;
+                    ee232h.Cbus4 = eeData.Cbus4;
+                    ee232h.Cbus5 = eeData.Cbus5;
+                    ee232h.Cbus6 = eeData.Cbus6;
+                    ee232h.Cbus7 = eeData.Cbus7;
+                    ee232h.Cbus8 = eeData.Cbus8;
+                    ee232h.Cbus9 = eeData.Cbus9;
+                    ee232h.IsFifo = Convert.ToBoolean(eeData.IsFifo);
+                    ee232h.IsFifoTar = Convert.ToBoolean(eeData.IsFifoTar);
+                    ee232h.IsFastSer = Convert.ToBoolean(eeData.IsFastSer);
+                    ee232h.IsFT1248 = Convert.ToBoolean(eeData.IsFT1248);
+                    ee232h.FT1248Cpol = Convert.ToBoolean(eeData.FT1248Cpol);
+                    ee232h.FT1248Lsb = Convert.ToBoolean(eeData.FT1248Lsb);
+                    ee232h.FT1248FlowControl = Convert.ToBoolean(eeData.FT1248FlowControl);
+                    ee232h.PowerSaveEnable = Convert.ToBoolean(eeData.PowerSaveEnable);
+                    ee232h.IsVCP = (eeData.DriverType == FT_DRIVER_TYPE_VCP);
+                }
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(eeDataMarshal);
+            }
+
             return ftStatus;
         }
 
@@ -4078,6 +4971,10 @@ namespace FTD2XX_NET
             // Initialise ftStatus to something other than FT_OK
             FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
             FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
+
+            // Validate parameter
+            if (eeX == null)
+                return ftStatus;
 
             // If the DLL hasn't been loaded, just return here
             if (hFTD2XXDLL == IntPtr.Zero)
@@ -4116,81 +5013,89 @@ namespace FTD2XX_NET
 
                     // Allocate space for our pointer...
                     IntPtr eeDataMarshal = Marshal.AllocHGlobal(size);
-                    Marshal.StructureToPtr(eeData, eeDataMarshal, false);
-                    
-                    // Call FT_EEPROM_Read
-                    ftStatus = FT_EEPROM_Read(ftHandle, eeDataMarshal, (uint)size, manufacturer, manufacturerID, description, serialNumber);
 
-                    if (ftStatus == FT_STATUS.FT_OK)
+                    try
                     {
-                        // Get the data back from the pointer...
-                        eeData = (FT_XSERIES_DATA)Marshal.PtrToStructure(eeDataMarshal, typeof(FT_XSERIES_DATA));
+                        Marshal.StructureToPtr(eeData, eeDataMarshal, false);
 
-                        // Retrieve string values
-                        System.Text.UTF8Encoding enc = new System.Text.UTF8Encoding();
-                        eeX.Manufacturer = enc.GetString(manufacturer);
-                        eeX.ManufacturerID = enc.GetString(manufacturerID);
-                        eeX.Description = enc.GetString(description);
-                        eeX.SerialNumber = enc.GetString(serialNumber);
-                        // Map non-string elements to structure to be returned
-                        // Standard elements
-                        eeX.VendorID = eeData.common.VendorId;
-                        eeX.ProductID = eeData.common.ProductId;
-                        eeX.MaxPower = eeData.common.MaxPower;
-                        eeX.SelfPowered = Convert.ToBoolean(eeData.common.SelfPowered);
-                        eeX.RemoteWakeup = Convert.ToBoolean(eeData.common.RemoteWakeup);
-                        eeX.SerNumEnable = Convert.ToBoolean(eeData.common.SerNumEnable);
-                        eeX.PullDownEnable = Convert.ToBoolean(eeData.common.PullDownEnable);
-                        // X-Series specific fields
-                        // CBUS
-                        eeX.Cbus0 = eeData.Cbus0;
-                        eeX.Cbus1 = eeData.Cbus1;
-                        eeX.Cbus2 = eeData.Cbus2;
-                        eeX.Cbus3 = eeData.Cbus3;
-                        eeX.Cbus4 = eeData.Cbus4;
-                        eeX.Cbus5 = eeData.Cbus5;
-                        eeX.Cbus6 = eeData.Cbus6;
-                        // Drive Options
-                        eeX.ACDriveCurrent = eeData.ACDriveCurrent;
-                        eeX.ACSchmittInput = eeData.ACSchmittInput;
-                        eeX.ACSlowSlew = eeData.ACSlowSlew;
-                        eeX.ADDriveCurrent = eeData.ADDriveCurrent;
-                        eeX.ADSchmittInput = eeData.ADSchmittInput;
-                        eeX.ADSlowSlew = eeData.ADSlowSlew;
-                        // BCD
-                        eeX.BCDDisableSleep = eeData.BCDDisableSleep;
-                        eeX.BCDEnable = eeData.BCDEnable;
-                        eeX.BCDForceCbusPWREN = eeData.BCDForceCbusPWREN;
-                        // FT1248
-                        eeX.FT1248Cpol = eeData.FT1248Cpol;
-                        eeX.FT1248FlowControl = eeData.FT1248FlowControl;
-                        eeX.FT1248Lsb = eeData.FT1248Lsb;
-                        // I2C
-                        eeX.I2CDeviceId = eeData.I2CDeviceId;
-                        eeX.I2CDisableSchmitt = eeData.I2CDisableSchmitt;
-                        eeX.I2CSlaveAddress = eeData.I2CSlaveAddress;
-                        // RS232 Signals
-                        eeX.InvertCTS = eeData.InvertCTS;
-                        eeX.InvertDCD = eeData.InvertDCD;
-                        eeX.InvertDSR = eeData.InvertDSR;
-                        eeX.InvertDTR = eeData.InvertDTR;
-                        eeX.InvertRI = eeData.InvertRI;
-                        eeX.InvertRTS = eeData.InvertRTS;
-                        eeX.InvertRXD = eeData.InvertRXD;
-                        eeX.InvertTXD = eeData.InvertTXD;
-                        // Hardware Options
-                        eeX.PowerSaveEnable = eeData.PowerSaveEnable;
-                        eeX.RS485EchoSuppress = eeData.RS485EchoSuppress;
-                        // Driver Option
-                        eeX.IsVCP = eeData.DriverType;
+                        // Call FT_EEPROM_Read
+                        ftStatus = FT_EEPROM_Read(ftHandle, eeDataMarshal, (uint)size, manufacturer, manufacturerID, description, serialNumber);
+
+                        if (ftStatus == FT_STATUS.FT_OK)
+                        {
+                            // Get the data back from the pointer...
+                            eeData = (FT_XSERIES_DATA)Marshal.PtrToStructure(eeDataMarshal, typeof(FT_XSERIES_DATA));
+
+                            // Retrieve string values
+                            eeX.Manufacturer = DecodeNullTerminatedUtf8(manufacturer);
+                            eeX.ManufacturerID = DecodeNullTerminatedUtf8(manufacturerID);
+                            eeX.Description = DecodeNullTerminatedUtf8(description);
+                            eeX.SerialNumber = DecodeNullTerminatedUtf8(serialNumber);
+                            // Map non-string elements to structure to be returned
+                            // Standard elements
+                            eeX.VendorID = eeData.common.VendorId;
+                            eeX.ProductID = eeData.common.ProductId;
+                            eeX.MaxPower = eeData.common.MaxPower;
+                            eeX.SelfPowered = Convert.ToBoolean(eeData.common.SelfPowered);
+                            eeX.RemoteWakeup = Convert.ToBoolean(eeData.common.RemoteWakeup);
+                            eeX.SerNumEnable = Convert.ToBoolean(eeData.common.SerNumEnable);
+                            eeX.PullDownEnable = Convert.ToBoolean(eeData.common.PullDownEnable);
+                            // X-Series specific fields
+                            // CBUS
+                            eeX.Cbus0 = eeData.Cbus0;
+                            eeX.Cbus1 = eeData.Cbus1;
+                            eeX.Cbus2 = eeData.Cbus2;
+                            eeX.Cbus3 = eeData.Cbus3;
+                            eeX.Cbus4 = eeData.Cbus4;
+                            eeX.Cbus5 = eeData.Cbus5;
+                            eeX.Cbus6 = eeData.Cbus6;
+                            // Drive Options
+                            eeX.ACDriveCurrent = eeData.ACDriveCurrent;
+                            eeX.ACSchmittInput = eeData.ACSchmittInput;
+                            eeX.ACSlowSlew = eeData.ACSlowSlew;
+                            eeX.ADDriveCurrent = eeData.ADDriveCurrent;
+                            eeX.ADSchmittInput = eeData.ADSchmittInput;
+                            eeX.ADSlowSlew = eeData.ADSlowSlew;
+                            // BCD
+                            eeX.BCDDisableSleep = eeData.BCDDisableSleep;
+                            eeX.BCDEnable = eeData.BCDEnable;
+                            eeX.BCDForceCbusPWREN = eeData.BCDForceCbusPWREN;
+                            // FT1248
+                            eeX.FT1248Cpol = eeData.FT1248Cpol;
+                            eeX.FT1248FlowControl = eeData.FT1248FlowControl;
+                            eeX.FT1248Lsb = eeData.FT1248Lsb;
+                            // I2C
+                            eeX.I2CDeviceId = eeData.I2CDeviceId;
+                            eeX.I2CDisableSchmitt = eeData.I2CDisableSchmitt;
+                            eeX.I2CSlaveAddress = eeData.I2CSlaveAddress;
+                            // RS232 Signals
+                            eeX.InvertCTS = eeData.InvertCTS;
+                            eeX.InvertDCD = eeData.InvertDCD;
+                            eeX.InvertDSR = eeData.InvertDSR;
+                            eeX.InvertDTR = eeData.InvertDTR;
+                            eeX.InvertRI = eeData.InvertRI;
+                            eeX.InvertRTS = eeData.InvertRTS;
+                            eeX.InvertRXD = eeData.InvertRXD;
+                            eeX.InvertTXD = eeData.InvertTXD;
+                            // Hardware Options
+                            eeX.PowerSaveEnable = eeData.PowerSaveEnable;
+                            eeX.RS485EchoSuppress = eeData.RS485EchoSuppress;
+                            // Driver Option
+                            eeX.IsVCP = eeData.DriverType;
+                        }
+                    }
+                    finally
+                    {
+                        // Free unmanaged buffer
+                        Marshal.FreeHGlobal(eeDataMarshal);
                     }
                 }
             }
             else
             {
-                if (pFT_EE_Read == IntPtr.Zero)
+                if (pFT_EEPROM_Read == IntPtr.Zero)
                 {
-                    Console.WriteLine("Failed to load function FT_EE_Read.");
+                    Console.WriteLine("Failed to load function FT_EEPROM_Read.");
                 }
             }
             return ftStatus;
@@ -4213,11 +5118,82 @@ namespace FTD2XX_NET
             FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
             FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
 
+            // Validate parameter
+            if (ee232b == null)
+                return ftStatus;
+
             // If the DLL hasn't been loaded, just return here
             if (hFTD2XXDLL == IntPtr.Zero)
                 return ftStatus;
 
-            // Check for our required function pointers being set up
+            // Use FT_EEPROM_Program when available (for device-specific structure + UTF-8 strings)
+            if (pFT_EEPROM_Program != IntPtr.Zero)
+            {
+                tFT_EEPROM_Program FT_EEPROM_Program = (tFT_EEPROM_Program)Marshal.GetDelegateForFunctionPointer(pFT_EEPROM_Program, typeof(tFT_EEPROM_Program));
+
+                if (ftHandle != IntPtr.Zero)
+                {
+                    FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
+                    GetDeviceType(ref DeviceType);
+                    if (DeviceType != FT_DEVICE.FT_DEVICE_BM)
+                    {
+                        ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
+                        ErrorHandler(ftStatus, ftErrorCondition);
+                    }
+
+                    if ((ee232b.VendorID == 0x0000) | (ee232b.ProductID == 0x0000))
+                        return FT_STATUS.FT_INVALID_PARAMETER;
+
+                    // Use device-specific FT_232B_DATA structure
+                    FT_232B_DATA eeData = new FT_232B_DATA();
+                    FT_EEPROM_HEADER eeHeader = new FT_EEPROM_HEADER();
+
+                    eeHeader.deviceType = (uint)FT_DEVICE.FT_DEVICE_BM;
+                    eeHeader.VendorId = ee232b.VendorID;
+                    eeHeader.ProductId = ee232b.ProductID;
+                    eeHeader.MaxPower = ee232b.MaxPower;
+                    eeHeader.SelfPowered = Convert.ToByte(ee232b.SelfPowered);
+                    eeHeader.RemoteWakeup = Convert.ToByte(ee232b.RemoteWakeup);
+                    eeHeader.SerNumEnable = Convert.ToByte(ee232b.SerNumEnable);
+                    eeHeader.PullDownEnable = Convert.ToByte(ee232b.PullDownEnable);
+                    eeData.common = eeHeader;
+
+                    eeData.USBVersionEnable = Convert.ToByte(ee232b.USBVersionEnable);
+                    eeData.USBVersion = ee232b.USBVersion;
+
+                    // Encode strings as UTF-8
+                    byte[] manufacturer = EncodeNullTerminatedUtf8(ee232b.Manufacturer, 32);
+                    byte[] manufacturerId = EncodeNullTerminatedUtf8(ee232b.ManufacturerID, 16);
+                    byte[] description = EncodeNullTerminatedUtf8(ee232b.Description, 64);
+                    byte[] serialNumber = EncodeNullTerminatedUtf8(ee232b.SerialNumber, 16);
+
+                    int size = Marshal.SizeOf(eeData);
+                    IntPtr eeDataMarshal = Marshal.AllocHGlobal(size);
+
+                    try
+                    {
+                        Marshal.StructureToPtr(eeData, eeDataMarshal, false);
+                        ftStatus = FT_EEPROM_Program(ftHandle, eeDataMarshal, (uint)size, manufacturer, manufacturerId, description, serialNumber);
+                    }
+                    finally
+                    {
+                        Marshal.FreeHGlobal(eeDataMarshal);
+                    }
+
+                    return ftStatus;
+                }
+            }
+
+            // Fallback to legacy FT_EE_Program if FT_EEPROM_Program not available
+            return WriteFT232BEEPROM_Legacy(ee232b);
+        }
+
+        // Legacy implementation using FT_EE_Program  
+        private FT_STATUS WriteFT232BEEPROM_Legacy(FT232B_EEPROM_STRUCTURE ee232b)
+        {
+            FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
+            FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
+
             if (pFT_EE_Program != IntPtr.Zero)
             {
                 tFT_EE_Program FT_EE_Program = (tFT_EE_Program)Marshal.GetDelegateForFunctionPointer(pFT_EE_Program, typeof(tFT_EE_Program));
@@ -4225,21 +5201,15 @@ namespace FTD2XX_NET
                 if (ftHandle != IntPtr.Zero)
                 {
                     FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
-                    // Check that it is an FT232B or FT245B that we are trying to write
                     GetDeviceType(ref DeviceType);
                     if (DeviceType != FT_DEVICE.FT_DEVICE_BM)
                     {
-                        // If it is not, throw an exception
                         ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
                         ErrorHandler(ftStatus, ftErrorCondition);
                     }
 
-                    // Check for VID and PID of 0x0000
                     if ((ee232b.VendorID == 0x0000) | (ee232b.ProductID == 0x0000))
-                    {
-                        // Do not allow users to program the device with VID or PID of 0x0000
                         return FT_STATUS.FT_INVALID_PARAMETER;
-                    }
 
                     FT_PROGRAM_DATA eedata = new FT_PROGRAM_DATA();
 
@@ -4254,52 +5224,45 @@ namespace FTD2XX_NET
                     eedata.Description = Marshal.AllocHGlobal(64);
                     eedata.SerialNumber = Marshal.AllocHGlobal(16);
 
-                    // Check lengths of strings to make sure that they are within our limits
-                    // If not, trim them to make them our maximum length
-                    if (ee232b.Manufacturer.Length > 32)
-                        ee232b.Manufacturer = ee232b.Manufacturer.Substring(0, 32);
-                    if (ee232b.ManufacturerID.Length > 16)
-                        ee232b.ManufacturerID = ee232b.ManufacturerID.Substring(0, 16);
-                    if (ee232b.Description.Length > 64)
-                        ee232b.Description = ee232b.Description.Substring(0, 64);
-                    if (ee232b.SerialNumber.Length > 16)
-                        ee232b.SerialNumber = ee232b.SerialNumber.Substring(0, 16);
+                    try
+                    {
+                        // Check lengths of strings
+                        if (ee232b.Manufacturer.Length > 32)
+                            ee232b.Manufacturer = ee232b.Manufacturer.Substring(0, 32);
+                        if (ee232b.ManufacturerID.Length > 16)
+                            ee232b.ManufacturerID = ee232b.ManufacturerID.Substring(0, 16);
+                        if (ee232b.Description.Length > 64)
+                            ee232b.Description = ee232b.Description.Substring(0, 64);
+                        if (ee232b.SerialNumber.Length > 16)
+                            ee232b.SerialNumber = ee232b.SerialNumber.Substring(0, 16);
 
-                    // Set string values
-                    eedata.Manufacturer = Marshal.StringToHGlobalAnsi(ee232b.Manufacturer);
-                    eedata.ManufacturerID = Marshal.StringToHGlobalAnsi(ee232b.ManufacturerID);
-                    eedata.Description = Marshal.StringToHGlobalAnsi(ee232b.Description);
-                    eedata.SerialNumber = Marshal.StringToHGlobalAnsi(ee232b.SerialNumber);
+                        // Set string values
+                        eedata.Manufacturer = Marshal.StringToHGlobalAnsi(ee232b.Manufacturer);
+                        eedata.ManufacturerID = Marshal.StringToHGlobalAnsi(ee232b.ManufacturerID);
+                        eedata.Description = Marshal.StringToHGlobalAnsi(ee232b.Description);
+                        eedata.SerialNumber = Marshal.StringToHGlobalAnsi(ee232b.SerialNumber);
 
-                    // Map non-string elements to structure
-                    // Standard elements
-                    eedata.VendorID = ee232b.VendorID;
-                    eedata.ProductID = ee232b.ProductID;
-                    eedata.MaxPower = ee232b.MaxPower;
-                    eedata.SelfPowered = Convert.ToUInt16(ee232b.SelfPowered);
-                    eedata.RemoteWakeup = Convert.ToUInt16(ee232b.RemoteWakeup);
-                    // B specific fields
-                    eedata.Rev4 = Convert.ToByte(true);
-                    eedata.PullDownEnable = Convert.ToByte(ee232b.PullDownEnable);
-                    eedata.SerNumEnable = Convert.ToByte(ee232b.SerNumEnable);
-                    eedata.USBVersionEnable = Convert.ToByte(ee232b.USBVersionEnable);
-                    eedata.USBVersion = ee232b.USBVersion;
+                        // Map non-string elements
+                        eedata.VendorID = ee232b.VendorID;
+                        eedata.ProductID = ee232b.ProductID;
+                        eedata.MaxPower = ee232b.MaxPower;
+                        eedata.SelfPowered = Convert.ToUInt16(ee232b.SelfPowered);
+                        eedata.RemoteWakeup = Convert.ToUInt16(ee232b.RemoteWakeup);
+                        eedata.Rev4 = Convert.ToByte(true);
+                        eedata.PullDownEnable = Convert.ToByte(ee232b.PullDownEnable);
+                        eedata.SerNumEnable = Convert.ToByte(ee232b.SerNumEnable);
+                        eedata.USBVersionEnable = Convert.ToByte(ee232b.USBVersionEnable);
+                        eedata.USBVersion = ee232b.USBVersion;
 
-                    // Call FT_EE_Program
-                    ftStatus = FT_EE_Program(ftHandle, eedata);
-
-                    // Free unmanaged buffers
-                    Marshal.FreeHGlobal(eedata.Manufacturer);
-                    Marshal.FreeHGlobal(eedata.ManufacturerID);
-                    Marshal.FreeHGlobal(eedata.Description);
-                    Marshal.FreeHGlobal(eedata.SerialNumber);
-                }
-            }
-            else
-            {
-                if (pFT_EE_Program == IntPtr.Zero)
-                {
-                    Console.WriteLine("Failed to load function FT_EE_Program.");
+                        ftStatus = FT_EE_Program(ftHandle, eedata);
+                    }
+                    finally
+                    {
+                        Marshal.FreeHGlobal(eedata.Manufacturer);
+                        Marshal.FreeHGlobal(eedata.ManufacturerID);
+                        Marshal.FreeHGlobal(eedata.Description);
+                        Marshal.FreeHGlobal(eedata.SerialNumber);
+                    }
                 }
             }
             return ftStatus;
@@ -4323,11 +5286,91 @@ namespace FTD2XX_NET
             FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
             FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
 
+            // Validate parameter
+            if (ee2232 == null)
+                return ftStatus;
+
             // If the DLL hasn't been loaded, just return here
             if (hFTD2XXDLL == IntPtr.Zero)
                 return ftStatus;
 
-            // Check for our required function pointers being set up
+            // Use FT_EEPROM_Program when available (for device-specific structure + UTF-8 strings)
+            if (pFT_EEPROM_Program != IntPtr.Zero)
+            {
+                tFT_EEPROM_Program FT_EEPROM_Program = (tFT_EEPROM_Program)Marshal.GetDelegateForFunctionPointer(pFT_EEPROM_Program, typeof(tFT_EEPROM_Program));
+
+                if (ftHandle != IntPtr.Zero)
+                {
+                    FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
+                    GetDeviceType(ref DeviceType);
+                    if (DeviceType != FT_DEVICE.FT_DEVICE_2232)
+                    {
+                        ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
+                        ErrorHandler(ftStatus, ftErrorCondition);
+                    }
+
+                    if ((ee2232.VendorID == 0x0000) | (ee2232.ProductID == 0x0000))
+                        return FT_STATUS.FT_INVALID_PARAMETER;
+
+                    // Use device-specific FT_2232_DATA structure
+                    FT_2232_DATA eeData = new FT_2232_DATA();
+                    FT_EEPROM_HEADER eeHeader = new FT_EEPROM_HEADER();
+
+                    eeHeader.deviceType = (uint)FT_DEVICE.FT_DEVICE_2232;
+                    eeHeader.VendorId = ee2232.VendorID;
+                    eeHeader.ProductId = ee2232.ProductID;
+                    eeHeader.MaxPower = ee2232.MaxPower;
+                    eeHeader.SelfPowered = Convert.ToByte(ee2232.SelfPowered);
+                    eeHeader.RemoteWakeup = Convert.ToByte(ee2232.RemoteWakeup);
+                    eeHeader.SerNumEnable = Convert.ToByte(ee2232.SerNumEnable);
+                    eeHeader.PullDownEnable = Convert.ToByte(ee2232.PullDownEnable);
+                    eeData.common = eeHeader;
+
+                    eeData.AIsHighCurrent = Convert.ToByte(ee2232.AIsHighCurrent);
+                    eeData.BIsHighCurrent = Convert.ToByte(ee2232.BIsHighCurrent);
+                    eeData.IFAIsFifo = Convert.ToByte(ee2232.IFAIsFifo);
+                    eeData.IFAIsFifoTar = Convert.ToByte(ee2232.IFAIsFifoTar);
+                    eeData.IFAIsFastSer = Convert.ToByte(ee2232.IFAIsFastSer);
+                    eeData.AIsVCP = Convert.ToByte(ee2232.AIsVCP);
+                    eeData.IFBIsFifo = Convert.ToByte(ee2232.IFBIsFifo);
+                    eeData.IFBIsFifoTar = Convert.ToByte(ee2232.IFBIsFifoTar);
+                    eeData.IFBIsFastSer = Convert.ToByte(ee2232.IFBIsFastSer);
+                    eeData.BIsVCP = Convert.ToByte(ee2232.BIsVCP);
+
+
+                    // Encode strings as UTF-8
+                    byte[] manufacturer = EncodeNullTerminatedUtf8(ee2232.Manufacturer, 32);
+                    byte[] manufacturerId = EncodeNullTerminatedUtf8(ee2232.ManufacturerID, 16);
+                    byte[] description = EncodeNullTerminatedUtf8(ee2232.Description, 64);
+                    byte[] serialNumber = EncodeNullTerminatedUtf8(ee2232.SerialNumber, 16);
+
+                    int size = Marshal.SizeOf(eeData);
+                    IntPtr eeDataMarshal = Marshal.AllocHGlobal(size);
+
+                    try
+                    {
+                        Marshal.StructureToPtr(eeData, eeDataMarshal, false);
+                        ftStatus = FT_EEPROM_Program(ftHandle, eeDataMarshal, (uint)size, manufacturer, manufacturerId, description, serialNumber);
+                    }
+                    finally
+                    {
+                        Marshal.FreeHGlobal(eeDataMarshal);
+                    }
+
+                    return ftStatus;
+                }
+            }
+
+            // Fallback to legacy FT_EE_Program if FT_EEPROM_Program not available
+            return WriteFT2232EEPROM_Legacy(ee2232);
+        }
+
+        // Legacy implementation using FT_EE_Program
+        private FT_STATUS WriteFT2232EEPROM_Legacy(FT2232_EEPROM_STRUCTURE ee2232)
+        {
+            FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
+            FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
+
             if (pFT_EE_Program != IntPtr.Zero)
             {
                 tFT_EE_Program FT_EE_Program = (tFT_EE_Program)Marshal.GetDelegateForFunctionPointer(pFT_EE_Program, typeof(tFT_EE_Program));
@@ -4335,21 +5378,15 @@ namespace FTD2XX_NET
                 if (ftHandle != IntPtr.Zero)
                 {
                     FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
-                    // Check that it is an FT2232 that we are trying to write
                     GetDeviceType(ref DeviceType);
                     if (DeviceType != FT_DEVICE.FT_DEVICE_2232)
                     {
-                        // If it is not, throw an exception
                         ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
                         ErrorHandler(ftStatus, ftErrorCondition);
                     }
 
-                    // Check for VID and PID of 0x0000
                     if ((ee2232.VendorID == 0x0000) | (ee2232.ProductID == 0x0000))
-                    {
-                        // Do not allow users to program the device with VID or PID of 0x0000
                         return FT_STATUS.FT_INVALID_PARAMETER;
-                    }
 
                     FT_PROGRAM_DATA eedata = new FT_PROGRAM_DATA();
 
@@ -4364,62 +5401,55 @@ namespace FTD2XX_NET
                     eedata.Description = Marshal.AllocHGlobal(64);
                     eedata.SerialNumber = Marshal.AllocHGlobal(16);
 
-                    // Check lengths of strings to make sure that they are within our limits
-                    // If not, trim them to make them our maximum length
-                    if (ee2232.Manufacturer.Length > 32)
-                        ee2232.Manufacturer = ee2232.Manufacturer.Substring(0, 32);
-                    if (ee2232.ManufacturerID.Length > 16)
-                        ee2232.ManufacturerID = ee2232.ManufacturerID.Substring(0, 16);
-                    if (ee2232.Description.Length > 64)
-                        ee2232.Description = ee2232.Description.Substring(0, 64);
-                    if (ee2232.SerialNumber.Length > 16)
-                        ee2232.SerialNumber = ee2232.SerialNumber.Substring(0, 16);
+                    try
+                    {
+                        // Check lengths of strings
+                        if (ee2232.Manufacturer.Length > 32)
+                            ee2232.Manufacturer = ee2232.Manufacturer.Substring(0, 32);
+                        if (ee2232.ManufacturerID.Length > 16)
+                            ee2232.ManufacturerID = ee2232.ManufacturerID.Substring(0, 16);
+                        if (ee2232.Description.Length > 64)
+                            ee2232.Description = ee2232.Description.Substring(0, 64);
+                        if (ee2232.SerialNumber.Length > 16)
+                            ee2232.SerialNumber = ee2232.SerialNumber.Substring(0, 16);
 
-                    // Set string values
-                    eedata.Manufacturer = Marshal.StringToHGlobalAnsi(ee2232.Manufacturer);
-                    eedata.ManufacturerID = Marshal.StringToHGlobalAnsi(ee2232.ManufacturerID);
-                    eedata.Description = Marshal.StringToHGlobalAnsi(ee2232.Description);
-                    eedata.SerialNumber = Marshal.StringToHGlobalAnsi(ee2232.SerialNumber);
+                        // Set string values
+                        eedata.Manufacturer = Marshal.StringToHGlobalAnsi(ee2232.Manufacturer);
+                        eedata.ManufacturerID = Marshal.StringToHGlobalAnsi(ee2232.ManufacturerID);
+                        eedata.Description = Marshal.StringToHGlobalAnsi(ee2232.Description);
+                        eedata.SerialNumber = Marshal.StringToHGlobalAnsi(ee2232.SerialNumber);
 
-                    // Map non-string elements to structure
-                    // Standard elements
-                    eedata.VendorID = ee2232.VendorID;
-                    eedata.ProductID = ee2232.ProductID;
-                    eedata.MaxPower = ee2232.MaxPower;
-                    eedata.SelfPowered = Convert.ToUInt16(ee2232.SelfPowered);
-                    eedata.RemoteWakeup = Convert.ToUInt16(ee2232.RemoteWakeup);
-                    // 2232 specific fields
-                    eedata.Rev5 = Convert.ToByte(true);
-                    eedata.PullDownEnable5 = Convert.ToByte(ee2232.PullDownEnable);
-                    eedata.SerNumEnable5 = Convert.ToByte(ee2232.SerNumEnable);
-                    eedata.USBVersionEnable5 = Convert.ToByte(ee2232.USBVersionEnable);
-                    eedata.USBVersion5 = ee2232.USBVersion;
-                    eedata.AIsHighCurrent = Convert.ToByte(ee2232.AIsHighCurrent);
-                    eedata.BIsHighCurrent = Convert.ToByte(ee2232.BIsHighCurrent);
-                    eedata.IFAIsFifo = Convert.ToByte(ee2232.IFAIsFifo);
-                    eedata.IFAIsFifoTar = Convert.ToByte(ee2232.IFAIsFifoTar);
-                    eedata.IFAIsFastSer = Convert.ToByte(ee2232.IFAIsFastSer);
-                    eedata.AIsVCP = Convert.ToByte(ee2232.AIsVCP);
-                    eedata.IFBIsFifo = Convert.ToByte(ee2232.IFBIsFifo);
-                    eedata.IFBIsFifoTar = Convert.ToByte(ee2232.IFBIsFifoTar);
-                    eedata.IFBIsFastSer = Convert.ToByte(ee2232.IFBIsFastSer);
-                    eedata.BIsVCP = Convert.ToByte(ee2232.BIsVCP);
+                        // Map non-string elements
+                        eedata.VendorID = ee2232.VendorID;
+                        eedata.ProductID = ee2232.ProductID;
+                        eedata.MaxPower = ee2232.MaxPower;
+                        eedata.SelfPowered = Convert.ToUInt16(ee2232.SelfPowered);
+                        eedata.RemoteWakeup = Convert.ToUInt16(ee2232.RemoteWakeup);
+                        eedata.Rev5 = Convert.ToByte(true);
+                        eedata.PullDownEnable5 = Convert.ToByte(ee2232.PullDownEnable);
+                        eedata.SerNumEnable5 = Convert.ToByte(ee2232.SerNumEnable);
+                        eedata.USBVersionEnable5 = Convert.ToByte(ee2232.USBVersionEnable);
+                        eedata.USBVersion5 = ee2232.USBVersion;
+                        eedata.AIsHighCurrent = Convert.ToByte(ee2232.AIsHighCurrent);
+                        eedata.BIsHighCurrent = Convert.ToByte(ee2232.BIsHighCurrent);
+                        eedata.IFAIsFifo = Convert.ToByte(ee2232.IFAIsFifo);
+                        eedata.IFAIsFifoTar = Convert.ToByte(ee2232.IFAIsFifoTar);
+                        eedata.IFAIsFastSer = Convert.ToByte(ee2232.IFAIsFastSer);
+                        eedata.AIsVCP = Convert.ToByte(ee2232.AIsVCP);
+                        eedata.IFBIsFifo = Convert.ToByte(ee2232.IFBIsFifo);
+                        eedata.IFBIsFifoTar = Convert.ToByte(ee2232.IFBIsFifoTar);
+                        eedata.IFBIsFastSer = Convert.ToByte(ee2232.IFBIsFastSer);
+                        eedata.BIsVCP = Convert.ToByte(ee2232.BIsVCP);
 
-                    // Call FT_EE_Program
-                    ftStatus = FT_EE_Program(ftHandle, eedata);
-
-                    // Free unmanaged buffers
-                    Marshal.FreeHGlobal(eedata.Manufacturer);
-                    Marshal.FreeHGlobal(eedata.ManufacturerID);
-                    Marshal.FreeHGlobal(eedata.Description);
-                    Marshal.FreeHGlobal(eedata.SerialNumber);
-                }
-            }
-            else
-            {
-                if (pFT_EE_Program == IntPtr.Zero)
-                {
-                    Console.WriteLine("Failed to load function FT_EE_Program.");
+                        ftStatus = FT_EE_Program(ftHandle, eedata);
+                    }
+                    finally
+                    {
+                        Marshal.FreeHGlobal(eedata.Manufacturer);
+                        Marshal.FreeHGlobal(eedata.ManufacturerID);
+                        Marshal.FreeHGlobal(eedata.Description);
+                        Marshal.FreeHGlobal(eedata.SerialNumber);
+                    }
                 }
             }
             return ftStatus;
@@ -4443,11 +5473,96 @@ namespace FTD2XX_NET
             FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
             FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
 
+            // Validate parameter
+            if (ee232r == null)
+                return ftStatus;
+
             // If the DLL hasn't been loaded, just return here
             if (hFTD2XXDLL == IntPtr.Zero)
                 return ftStatus;
 
-            // Check for our required function pointers being set up
+            // Use FT_EEPROM_Program when available (for device-specific structure + UTF-8 strings)
+            if (pFT_EEPROM_Program != IntPtr.Zero)
+            {
+                tFT_EEPROM_Program FT_EEPROM_Program = (tFT_EEPROM_Program)Marshal.GetDelegateForFunctionPointer(pFT_EEPROM_Program, typeof(tFT_EEPROM_Program));
+
+                if (ftHandle != IntPtr.Zero)
+                {
+                    FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
+                    GetDeviceType(ref DeviceType);
+                    if (DeviceType != FT_DEVICE.FT_DEVICE_232R)
+                    {
+                        ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
+                        ErrorHandler(ftStatus, ftErrorCondition);
+                    }
+
+                    if ((ee232r.VendorID == 0x0000) | (ee232r.ProductID == 0x0000))
+                        return FT_STATUS.FT_INVALID_PARAMETER;
+
+                    // Use device-specific FT_232R_DATA structure
+                    FT_232R_DATA eeData = new FT_232R_DATA();
+                    FT_EEPROM_HEADER eeHeader = new FT_EEPROM_HEADER();
+
+                    eeHeader.deviceType = (uint)FT_DEVICE.FT_DEVICE_232R;
+                    eeHeader.VendorId = ee232r.VendorID;
+                    eeHeader.ProductId = ee232r.ProductID;
+                    eeHeader.MaxPower = ee232r.MaxPower;
+                    eeHeader.SelfPowered = Convert.ToByte(ee232r.SelfPowered);
+                    eeHeader.RemoteWakeup = Convert.ToByte(ee232r.RemoteWakeup);
+                    eeHeader.SerNumEnable = Convert.ToByte(ee232r.SerNumEnable);
+                    eeHeader.PullDownEnable = Convert.ToByte(ee232r.PullDownEnable);
+                    eeData.common = eeHeader;
+
+                    eeData.IsHighCurrent = Convert.ToByte(ee232r.HighDriveIOs);
+                    eeData.UseExtOsc = Convert.ToByte(ee232r.UseExtOsc);
+                    eeData.InvertTXD = Convert.ToByte(ee232r.InvertTXD);
+                    eeData.InvertRXD = Convert.ToByte(ee232r.InvertRXD);
+                    eeData.InvertRTS = Convert.ToByte(ee232r.InvertRTS);
+                    eeData.InvertCTS = Convert.ToByte(ee232r.InvertCTS);
+                    eeData.InvertDTR = Convert.ToByte(ee232r.InvertDTR);
+                    eeData.InvertDSR = Convert.ToByte(ee232r.InvertDSR);
+                    eeData.InvertDCD = Convert.ToByte(ee232r.InvertDCD);
+                    eeData.InvertRI = Convert.ToByte(ee232r.InvertRI);
+                    eeData.Cbus0 = ee232r.Cbus0;
+                    eeData.Cbus1 = ee232r.Cbus1;
+                    eeData.Cbus2 = ee232r.Cbus2;
+                    eeData.Cbus3 = ee232r.Cbus3;
+                    eeData.Cbus4 = ee232r.Cbus4;
+                    eeData.DriverType = ee232r.RIsD2XX ? FT_DRIVER_TYPE_D2XX : FT_DRIVER_TYPE_VCP;
+
+                    // Encode strings as UTF-8
+                    byte[] manufacturer = EncodeNullTerminatedUtf8(ee232r.Manufacturer, 32);
+                    byte[] manufacturerId = EncodeNullTerminatedUtf8(ee232r.ManufacturerID, 16);
+                    byte[] description = EncodeNullTerminatedUtf8(ee232r.Description, 64);
+                    byte[] serialNumber = EncodeNullTerminatedUtf8(ee232r.SerialNumber, 16);
+
+                    int size = Marshal.SizeOf(eeData);
+                    IntPtr eeDataMarshal = Marshal.AllocHGlobal(size);
+
+                    try
+                    {
+                        Marshal.StructureToPtr(eeData, eeDataMarshal, false);
+                        ftStatus = FT_EEPROM_Program(ftHandle, eeDataMarshal, (uint)size, manufacturer, manufacturerId, description, serialNumber);
+                    }
+                    finally
+                    {
+                        Marshal.FreeHGlobal(eeDataMarshal);
+                    }
+
+                    return ftStatus;
+                }
+            }
+
+            // Fallback to legacy FT_EE_Program if FT_EEPROM_Program not available
+            return WriteFT232REEPROM_Legacy(ee232r);
+        }
+
+        // Legacy implementation using FT_EE_Program
+        private FT_STATUS WriteFT232REEPROM_Legacy(FT232R_EEPROM_STRUCTURE ee232r)
+        {
+            FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
+            FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
+
             if (pFT_EE_Program != IntPtr.Zero)
             {
                 tFT_EE_Program FT_EE_Program = (tFT_EE_Program)Marshal.GetDelegateForFunctionPointer(pFT_EE_Program, typeof(tFT_EE_Program));
@@ -4455,21 +5570,15 @@ namespace FTD2XX_NET
                 if (ftHandle != IntPtr.Zero)
                 {
                     FT_DEVICE DeviceType = FT_DEVICE.FT_DEVICE_UNKNOWN;
-                    // Check that it is an FT232R or FT245R that we are trying to write
                     GetDeviceType(ref DeviceType);
                     if (DeviceType != FT_DEVICE.FT_DEVICE_232R)
                     {
-                        // If it is not, throw an exception
                         ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
                         ErrorHandler(ftStatus, ftErrorCondition);
                     }
 
-                    // Check for VID and PID of 0x0000
                     if ((ee232r.VendorID == 0x0000) | (ee232r.ProductID == 0x0000))
-                    {
-                        // Do not allow users to program the device with VID or PID of 0x0000
                         return FT_STATUS.FT_INVALID_PARAMETER;
-                    }
 
                     FT_PROGRAM_DATA eedata = new FT_PROGRAM_DATA();
 
@@ -4484,70 +5593,59 @@ namespace FTD2XX_NET
                     eedata.Description = Marshal.AllocHGlobal(64);
                     eedata.SerialNumber = Marshal.AllocHGlobal(16);
 
-                    // Check lengths of strings to make sure that they are within our limits
-                    // If not, trim them to make them our maximum length
-                    if (ee232r.Manufacturer.Length > 32)
-                        ee232r.Manufacturer = ee232r.Manufacturer.Substring(0, 32);
-                    if (ee232r.ManufacturerID.Length > 16)
-                        ee232r.ManufacturerID = ee232r.ManufacturerID.Substring(0, 16);
-                    if (ee232r.Description.Length > 64)
-                        ee232r.Description = ee232r.Description.Substring(0, 64);
-                    if (ee232r.SerialNumber.Length > 16)
-                        ee232r.SerialNumber = ee232r.SerialNumber.Substring(0, 16);
+                    try
+                    {
+                        // Check lengths of strings
+                        if (ee232r.Manufacturer.Length > 32)
+                            ee232r.Manufacturer = ee232r.Manufacturer.Substring(0, 32);
+                        if (ee232r.ManufacturerID.Length > 16)
+                            ee232r.ManufacturerID = ee232r.ManufacturerID.Substring(0, 16);
+                        if (ee232r.Description.Length > 64)
+                            ee232r.Description = ee232r.Description.Substring(0, 64);
+                        if (ee232r.SerialNumber.Length > 16)
+                            ee232r.SerialNumber = ee232r.SerialNumber.Substring(0, 16);
 
-                    // Set string values
-                    eedata.Manufacturer = Marshal.StringToHGlobalAnsi(ee232r.Manufacturer);
-                    eedata.ManufacturerID = Marshal.StringToHGlobalAnsi(ee232r.ManufacturerID);
-                    eedata.Description = Marshal.StringToHGlobalAnsi(ee232r.Description);
-                    eedata.SerialNumber = Marshal.StringToHGlobalAnsi(ee232r.SerialNumber);
+                        // Set string values
+                        eedata.Manufacturer = Marshal.StringToHGlobalAnsi(ee232r.Manufacturer);
+                        eedata.ManufacturerID = Marshal.StringToHGlobalAnsi(ee232r.ManufacturerID);
+                        eedata.Description = Marshal.StringToHGlobalAnsi(ee232r.Description);
+                        eedata.SerialNumber = Marshal.StringToHGlobalAnsi(ee232r.SerialNumber);
 
-                    // Map non-string elements to structure
-                    // Standard elements
-                    eedata.VendorID = ee232r.VendorID;
-                    eedata.ProductID = ee232r.ProductID;
-                    eedata.MaxPower = ee232r.MaxPower;
-                    eedata.SelfPowered = Convert.ToUInt16(ee232r.SelfPowered);
-                    eedata.RemoteWakeup = Convert.ToUInt16(ee232r.RemoteWakeup);
-                    // 232R specific fields
-                    eedata.PullDownEnableR = Convert.ToByte(ee232r.PullDownEnable);
-                    eedata.SerNumEnableR = Convert.ToByte(ee232r.SerNumEnable);
-                    eedata.UseExtOsc = Convert.ToByte(ee232r.UseExtOsc);
-                    eedata.HighDriveIOs = Convert.ToByte(ee232r.HighDriveIOs);
-                    // Override any endpoint size the user has selected and force 64 bytes
-                    // Some users have been known to wreck devices by setting 0 here...
-                    eedata.EndpointSize = 64;
-                    eedata.PullDownEnableR = Convert.ToByte(ee232r.PullDownEnable);
-                    eedata.SerNumEnableR = Convert.ToByte(ee232r.SerNumEnable);
-                    eedata.InvertTXD = Convert.ToByte(ee232r.InvertTXD);
-                    eedata.InvertRXD = Convert.ToByte(ee232r.InvertRXD);
-                    eedata.InvertRTS = Convert.ToByte(ee232r.InvertRTS);
-                    eedata.InvertCTS = Convert.ToByte(ee232r.InvertCTS);
-                    eedata.InvertDTR = Convert.ToByte(ee232r.InvertDTR);
-                    eedata.InvertDSR = Convert.ToByte(ee232r.InvertDSR);
-                    eedata.InvertDCD = Convert.ToByte(ee232r.InvertDCD);
-                    eedata.InvertRI = Convert.ToByte(ee232r.InvertRI);
-                    eedata.Cbus0 = ee232r.Cbus0;
-                    eedata.Cbus1 = ee232r.Cbus1;
-                    eedata.Cbus2 = ee232r.Cbus2;
-                    eedata.Cbus3 = ee232r.Cbus3;
-                    eedata.Cbus4 = ee232r.Cbus4;
-                    eedata.RIsD2XX = Convert.ToByte(ee232r.RIsD2XX);
+                        // Map non-string elements
+                        eedata.VendorID = ee232r.VendorID;
+                        eedata.ProductID = ee232r.ProductID;
+                        eedata.MaxPower = ee232r.MaxPower;
+                        eedata.SelfPowered = Convert.ToUInt16(ee232r.SelfPowered);
+                        eedata.RemoteWakeup = Convert.ToUInt16(ee232r.RemoteWakeup);
+                        eedata.PullDownEnableR = Convert.ToByte(ee232r.PullDownEnable);
+                        eedata.SerNumEnableR = Convert.ToByte(ee232r.SerNumEnable);
+                        eedata.UseExtOsc = Convert.ToByte(ee232r.UseExtOsc);
+                        eedata.HighDriveIOs = Convert.ToByte(ee232r.HighDriveIOs);
+                        eedata.EndpointSize = 64;
+                        eedata.InvertTXD = Convert.ToByte(ee232r.InvertTXD);
+                        eedata.InvertRXD = Convert.ToByte(ee232r.InvertRXD);
+                        eedata.InvertRTS = Convert.ToByte(ee232r.InvertRTS);
+                        eedata.InvertCTS = Convert.ToByte(ee232r.InvertCTS);
+                        eedata.InvertDTR = Convert.ToByte(ee232r.InvertDTR);
+                        eedata.InvertDSR = Convert.ToByte(ee232r.InvertDSR);
+                        eedata.InvertDCD = Convert.ToByte(ee232r.InvertDCD);
+                        eedata.InvertRI = Convert.ToByte(ee232r.InvertRI);
+                        eedata.Cbus0 = ee232r.Cbus0;
+                        eedata.Cbus1 = ee232r.Cbus1;
+                        eedata.Cbus2 = ee232r.Cbus2;
+                        eedata.Cbus3 = ee232r.Cbus3;
+                        eedata.Cbus4 = ee232r.Cbus4;
+                        eedata.RIsD2XX = Convert.ToByte(ee232r.RIsD2XX);
 
-                    // Call FT_EE_Program
-                    ftStatus = FT_EE_Program(ftHandle, eedata);
-
-                    // Free unmanaged buffers
-                    Marshal.FreeHGlobal(eedata.Manufacturer);
-                    Marshal.FreeHGlobal(eedata.ManufacturerID);
-                    Marshal.FreeHGlobal(eedata.Description);
-                    Marshal.FreeHGlobal(eedata.SerialNumber);
-                }
-            }
-            else
-            {
-                if (pFT_EE_Program == IntPtr.Zero)
-                {
-                    Console.WriteLine("Failed to load function FT_EE_Program.");
+                        ftStatus = FT_EE_Program(ftHandle, eedata);
+                    }
+                    finally
+                    {
+                        Marshal.FreeHGlobal(eedata.Manufacturer);
+                        Marshal.FreeHGlobal(eedata.ManufacturerID);
+                        Marshal.FreeHGlobal(eedata.Description);
+                        Marshal.FreeHGlobal(eedata.SerialNumber);
+                    }
                 }
             }
             return ftStatus;
@@ -4565,19 +5663,23 @@ namespace FTD2XX_NET
         /// <param name="ee2232h">The EEPROM settings to be written to the device</param>
         /// <remarks>If the strings are too long, they will be truncated to their maximum permitted lengths</remarks>
         /// <exception cref="FT_EXCEPTION">Thrown when the current device does not match the type required by this method.</exception>
-        public FT_STATUS WriteFT2232HEEPROM(FT2232H_EEPROM_STRUCTURE ee2232h)
-        {
+	        public FT_STATUS WriteFT2232HEEPROM(FT2232H_EEPROM_STRUCTURE ee2232h)
+	        {
             // Initialise ftStatus to something other than FT_OK
             FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
             FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
 
-            // If the DLL hasn't been loaded, just return here
-            if (hFTD2XXDLL == IntPtr.Zero)
+            // Validate parameter
+            if (ee2232h == null)
                 return ftStatus;
 
-            // Check for our required function pointers being set up
-            if (pFT_EE_Program != IntPtr.Zero)
-            {
+	            // If the DLL hasn't been loaded, just return here
+	            if (hFTD2XXDLL == IntPtr.Zero)
+	                return ftStatus;
+
+	            // Check for our required function pointers being set up
+	            if (pFT_EE_Program != IntPtr.Zero)
+	            {
                 tFT_EE_Program FT_EE_Program = (tFT_EE_Program)Marshal.GetDelegateForFunctionPointer(pFT_EE_Program, typeof(tFT_EE_Program));
 
                 if (ftHandle != IntPtr.Zero)
@@ -4586,11 +5688,11 @@ namespace FTD2XX_NET
                     // Check that it is an FT2232H that we are trying to write
                     GetDeviceType(ref DeviceType);
                     if (DeviceType != FT_DEVICE.FT_DEVICE_2232H)
-                    {
-                        // If it is not, throw an exception
-                        ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
-                        ErrorHandler(ftStatus, ftErrorCondition);
-                    }
+	                    {
+	                        // If it is not, throw an exception
+	                        ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
+	                        ErrorHandler(ftStatus, ftErrorCondition);
+	                    }
 
                     // Check for VID and PID of 0x0000
                     if ((ee2232h.VendorID == 0x0000) | (ee2232h.ProductID == 0x0000))
@@ -4612,63 +5714,68 @@ namespace FTD2XX_NET
                     eedata.Description = Marshal.AllocHGlobal(64);
                     eedata.SerialNumber = Marshal.AllocHGlobal(16);
 
-                    // Check lengths of strings to make sure that they are within our limits
-                    // If not, trim them to make them our maximum length
-                    if (ee2232h.Manufacturer.Length > 32)
-                        ee2232h.Manufacturer = ee2232h.Manufacturer.Substring(0, 32);
-                    if (ee2232h.ManufacturerID.Length > 16)
-                        ee2232h.ManufacturerID = ee2232h.ManufacturerID.Substring(0, 16);
-                    if (ee2232h.Description.Length > 64)
-                        ee2232h.Description = ee2232h.Description.Substring(0, 64);
-                    if (ee2232h.SerialNumber.Length > 16)
-                        ee2232h.SerialNumber = ee2232h.SerialNumber.Substring(0, 16);
+                    try
+                    {
+                        // Check lengths of strings to make sure that they are within our limits
+                        // If not, trim them to make them our maximum length
+                        if (ee2232h.Manufacturer.Length > 32)
+                            ee2232h.Manufacturer = ee2232h.Manufacturer.Substring(0, 32);
+                        if (ee2232h.ManufacturerID.Length > 16)
+                            ee2232h.ManufacturerID = ee2232h.ManufacturerID.Substring(0, 16);
+                        if (ee2232h.Description.Length > 64)
+                            ee2232h.Description = ee2232h.Description.Substring(0, 64);
+                        if (ee2232h.SerialNumber.Length > 16)
+                            ee2232h.SerialNumber = ee2232h.SerialNumber.Substring(0, 16);
 
-                    // Set string values
-                    eedata.Manufacturer = Marshal.StringToHGlobalAnsi(ee2232h.Manufacturer);
-                    eedata.ManufacturerID = Marshal.StringToHGlobalAnsi(ee2232h.ManufacturerID);
-                    eedata.Description = Marshal.StringToHGlobalAnsi(ee2232h.Description);
-                    eedata.SerialNumber = Marshal.StringToHGlobalAnsi(ee2232h.SerialNumber);
+                        // Set string values
+                        eedata.Manufacturer = Marshal.StringToHGlobalAnsi(ee2232h.Manufacturer);
+                        eedata.ManufacturerID = Marshal.StringToHGlobalAnsi(ee2232h.ManufacturerID);
+                        eedata.Description = Marshal.StringToHGlobalAnsi(ee2232h.Description);
+                        eedata.SerialNumber = Marshal.StringToHGlobalAnsi(ee2232h.SerialNumber);
 
-                    // Map non-string elements to structure
-                    // Standard elements
-                    eedata.VendorID = ee2232h.VendorID;
-                    eedata.ProductID = ee2232h.ProductID;
-                    eedata.MaxPower = ee2232h.MaxPower;
-                    eedata.SelfPowered = Convert.ToUInt16(ee2232h.SelfPowered);
-                    eedata.RemoteWakeup = Convert.ToUInt16(ee2232h.RemoteWakeup);
-                    // 2232H specific fields
-                    eedata.PullDownEnable7 = Convert.ToByte(ee2232h.PullDownEnable);
-                    eedata.SerNumEnable7 = Convert.ToByte(ee2232h.SerNumEnable);
-                    eedata.ALSlowSlew = Convert.ToByte(ee2232h.ALSlowSlew);
-                    eedata.ALSchmittInput = Convert.ToByte(ee2232h.ALSchmittInput);
-                    eedata.ALDriveCurrent = ee2232h.ALDriveCurrent;
-                    eedata.AHSlowSlew = Convert.ToByte(ee2232h.AHSlowSlew);
-                    eedata.AHSchmittInput = Convert.ToByte(ee2232h.AHSchmittInput);
-                    eedata.AHDriveCurrent = ee2232h.AHDriveCurrent;
-                    eedata.BLSlowSlew = Convert.ToByte(ee2232h.BLSlowSlew);
-                    eedata.BLSchmittInput = Convert.ToByte(ee2232h.BLSchmittInput);
-                    eedata.BLDriveCurrent = ee2232h.BLDriveCurrent;
-                    eedata.BHSlowSlew = Convert.ToByte(ee2232h.BHSlowSlew);
-                    eedata.BHSchmittInput = Convert.ToByte(ee2232h.BHSchmittInput);
-                    eedata.BHDriveCurrent = ee2232h.BHDriveCurrent;
-                    eedata.IFAIsFifo7 = Convert.ToByte(ee2232h.IFAIsFifo);
-                    eedata.IFAIsFifoTar7 = Convert.ToByte(ee2232h.IFAIsFifoTar);
-                    eedata.IFAIsFastSer7 = Convert.ToByte(ee2232h.IFAIsFastSer);
-                    eedata.AIsVCP7 = Convert.ToByte(ee2232h.AIsVCP);
-                    eedata.IFBIsFifo7 = Convert.ToByte(ee2232h.IFBIsFifo);
-                    eedata.IFBIsFifoTar7 = Convert.ToByte(ee2232h.IFBIsFifoTar);
-                    eedata.IFBIsFastSer7 = Convert.ToByte(ee2232h.IFBIsFastSer);
-                    eedata.BIsVCP7 = Convert.ToByte(ee2232h.BIsVCP);
-                    eedata.PowerSaveEnable = Convert.ToByte(ee2232h.PowerSaveEnable);
+                        // Map non-string elements to structure
+                        // Standard elements
+                        eedata.VendorID = ee2232h.VendorID;
+                        eedata.ProductID = ee2232h.ProductID;
+                        eedata.MaxPower = ee2232h.MaxPower;
+                        eedata.SelfPowered = Convert.ToUInt16(ee2232h.SelfPowered);
+                        eedata.RemoteWakeup = Convert.ToUInt16(ee2232h.RemoteWakeup);
+                        // 2232H specific fields
+                        eedata.PullDownEnable7 = Convert.ToByte(ee2232h.PullDownEnable);
+                        eedata.SerNumEnable7 = Convert.ToByte(ee2232h.SerNumEnable);
+                        eedata.ALSlowSlew = Convert.ToByte(ee2232h.ALSlowSlew);
+                        eedata.ALSchmittInput = Convert.ToByte(ee2232h.ALSchmittInput);
+                        eedata.ALDriveCurrent = ee2232h.ALDriveCurrent;
+                        eedata.AHSlowSlew = Convert.ToByte(ee2232h.AHSlowSlew);
+                        eedata.AHSchmittInput = Convert.ToByte(ee2232h.AHSchmittInput);
+                        eedata.AHDriveCurrent = ee2232h.AHDriveCurrent;
+                        eedata.BLSlowSlew = Convert.ToByte(ee2232h.BLSlowSlew);
+                        eedata.BLSchmittInput = Convert.ToByte(ee2232h.BLSchmittInput);
+                        eedata.BLDriveCurrent = ee2232h.BLDriveCurrent;
+                        eedata.BHSlowSlew = Convert.ToByte(ee2232h.BHSlowSlew);
+                        eedata.BHSchmittInput = Convert.ToByte(ee2232h.BHSchmittInput);
+                        eedata.BHDriveCurrent = ee2232h.BHDriveCurrent;
+                        eedata.IFAIsFifo7 = Convert.ToByte(ee2232h.IFAIsFifo);
+                        eedata.IFAIsFifoTar7 = Convert.ToByte(ee2232h.IFAIsFifoTar);
+                        eedata.IFAIsFastSer7 = Convert.ToByte(ee2232h.IFAIsFastSer);
+                        eedata.AIsVCP7 = Convert.ToByte(ee2232h.AIsVCP);
+                        eedata.IFBIsFifo7 = Convert.ToByte(ee2232h.IFBIsFifo);
+                        eedata.IFBIsFifoTar7 = Convert.ToByte(ee2232h.IFBIsFifoTar);
+                        eedata.IFBIsFastSer7 = Convert.ToByte(ee2232h.IFBIsFastSer);
+                        eedata.BIsVCP7 = Convert.ToByte(ee2232h.BIsVCP);
+                        eedata.PowerSaveEnable = Convert.ToByte(ee2232h.PowerSaveEnable);
 
-                    // Call FT_EE_Program
-                    ftStatus = FT_EE_Program(ftHandle, eedata);
-
-                    // Free unmanaged buffers
-                    Marshal.FreeHGlobal(eedata.Manufacturer);
-                    Marshal.FreeHGlobal(eedata.ManufacturerID);
-                    Marshal.FreeHGlobal(eedata.Description);
-                    Marshal.FreeHGlobal(eedata.SerialNumber);
+                        // Call FT_EE_Program
+                        ftStatus = FT_EE_Program(ftHandle, eedata);
+                    }
+                    finally
+                    {
+                        // Free unmanaged buffers
+                        Marshal.FreeHGlobal(eedata.Manufacturer);
+                        Marshal.FreeHGlobal(eedata.ManufacturerID);
+                        Marshal.FreeHGlobal(eedata.Description);
+                        Marshal.FreeHGlobal(eedata.SerialNumber);
+                    }
                 }
             }
             else
@@ -4693,19 +5800,23 @@ namespace FTD2XX_NET
         /// <param name="ee4232h">The EEPROM settings to be written to the device</param>
         /// <remarks>If the strings are too long, they will be truncated to their maximum permitted lengths</remarks>
         /// <exception cref="FT_EXCEPTION">Thrown when the current device does not match the type required by this method.</exception>
-        public FT_STATUS WriteFT4232HEEPROM(FT4232H_EEPROM_STRUCTURE ee4232h)
-        {
+	        public FT_STATUS WriteFT4232HEEPROM(FT4232H_EEPROM_STRUCTURE ee4232h)
+	        {
             // Initialise ftStatus to something other than FT_OK
             FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
             FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
 
-            // If the DLL hasn't been loaded, just return here
-            if (hFTD2XXDLL == IntPtr.Zero)
+            // Validate parameter
+            if (ee4232h == null)
                 return ftStatus;
 
-            // Check for our required function pointers being set up
-            if (pFT_EE_Program != IntPtr.Zero)
-            {
+	            // If the DLL hasn't been loaded, just return here
+	            if (hFTD2XXDLL == IntPtr.Zero)
+	                return ftStatus;
+
+	            // Check for our required function pointers being set up
+	            if (pFT_EE_Program != IntPtr.Zero)
+	            {
                 tFT_EE_Program FT_EE_Program = (tFT_EE_Program)Marshal.GetDelegateForFunctionPointer(pFT_EE_Program, typeof(tFT_EE_Program));
 
                 if (ftHandle != IntPtr.Zero)
@@ -4714,11 +5825,11 @@ namespace FTD2XX_NET
                     // Check that it is an FT4232H that we are trying to write
                     GetDeviceType(ref DeviceType);
                     if (DeviceType != FT_DEVICE.FT_DEVICE_4232H)
-                    {
-                        // If it is not, throw an exception
-                        ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
-                        ErrorHandler(ftStatus, ftErrorCondition);
-                    }
+	                    {
+	                        // If it is not, throw an exception
+	                        ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
+	                        ErrorHandler(ftStatus, ftErrorCondition);
+	                    }
 
                     // Check for VID and PID of 0x0000
                     if ((ee4232h.VendorID == 0x0000) | (ee4232h.ProductID == 0x0000))
@@ -4740,62 +5851,67 @@ namespace FTD2XX_NET
                     eedata.Description = Marshal.AllocHGlobal(64);
                     eedata.SerialNumber = Marshal.AllocHGlobal(16);
 
-                    // Check lengths of strings to make sure that they are within our limits
-                    // If not, trim them to make them our maximum length
-                    if (ee4232h.Manufacturer.Length > 32)
-                        ee4232h.Manufacturer = ee4232h.Manufacturer.Substring(0, 32);
-                    if (ee4232h.ManufacturerID.Length > 16)
-                        ee4232h.ManufacturerID = ee4232h.ManufacturerID.Substring(0, 16);
-                    if (ee4232h.Description.Length > 64)
-                        ee4232h.Description = ee4232h.Description.Substring(0, 64);
-                    if (ee4232h.SerialNumber.Length > 16)
-                        ee4232h.SerialNumber = ee4232h.SerialNumber.Substring(0, 16);
+                    try
+                    {
+                        // Check lengths of strings to make sure that they are within our limits
+                        // If not, trim them to make them our maximum length
+                        if (ee4232h.Manufacturer.Length > 32)
+                            ee4232h.Manufacturer = ee4232h.Manufacturer.Substring(0, 32);
+                        if (ee4232h.ManufacturerID.Length > 16)
+                            ee4232h.ManufacturerID = ee4232h.ManufacturerID.Substring(0, 16);
+                        if (ee4232h.Description.Length > 64)
+                            ee4232h.Description = ee4232h.Description.Substring(0, 64);
+                        if (ee4232h.SerialNumber.Length > 16)
+                            ee4232h.SerialNumber = ee4232h.SerialNumber.Substring(0, 16);
 
-                    // Set string values
-                    eedata.Manufacturer = Marshal.StringToHGlobalAnsi(ee4232h.Manufacturer);
-                    eedata.ManufacturerID = Marshal.StringToHGlobalAnsi(ee4232h.ManufacturerID);
-                    eedata.Description = Marshal.StringToHGlobalAnsi(ee4232h.Description);
-                    eedata.SerialNumber = Marshal.StringToHGlobalAnsi(ee4232h.SerialNumber);
+                        // Set string values
+                        eedata.Manufacturer = Marshal.StringToHGlobalAnsi(ee4232h.Manufacturer);
+                        eedata.ManufacturerID = Marshal.StringToHGlobalAnsi(ee4232h.ManufacturerID);
+                        eedata.Description = Marshal.StringToHGlobalAnsi(ee4232h.Description);
+                        eedata.SerialNumber = Marshal.StringToHGlobalAnsi(ee4232h.SerialNumber);
 
-                    // Map non-string elements to structure
-                    // Standard elements
-                    eedata.VendorID = ee4232h.VendorID;
-                    eedata.ProductID = ee4232h.ProductID;
-                    eedata.MaxPower = ee4232h.MaxPower;
-                    eedata.SelfPowered = Convert.ToUInt16(ee4232h.SelfPowered);
-                    eedata.RemoteWakeup = Convert.ToUInt16(ee4232h.RemoteWakeup);
-                    // 4232H specific fields
-                    eedata.PullDownEnable8 = Convert.ToByte(ee4232h.PullDownEnable);
-                    eedata.SerNumEnable8 = Convert.ToByte(ee4232h.SerNumEnable);
-                    eedata.ASlowSlew = Convert.ToByte(ee4232h.ASlowSlew);
-                    eedata.ASchmittInput = Convert.ToByte(ee4232h.ASchmittInput);
-                    eedata.ADriveCurrent = ee4232h.ADriveCurrent;
-                    eedata.BSlowSlew = Convert.ToByte(ee4232h.BSlowSlew);
-                    eedata.BSchmittInput = Convert.ToByte(ee4232h.BSchmittInput);
-                    eedata.BDriveCurrent = ee4232h.BDriveCurrent;
-                    eedata.CSlowSlew = Convert.ToByte(ee4232h.CSlowSlew);
-                    eedata.CSchmittInput = Convert.ToByte(ee4232h.CSchmittInput);
-                    eedata.CDriveCurrent = ee4232h.CDriveCurrent;
-                    eedata.DSlowSlew = Convert.ToByte(ee4232h.DSlowSlew);
-                    eedata.DSchmittInput = Convert.ToByte(ee4232h.DSchmittInput);
-                    eedata.DDriveCurrent = ee4232h.DDriveCurrent;
-                    eedata.ARIIsTXDEN = Convert.ToByte(ee4232h.ARIIsTXDEN);
-                    eedata.BRIIsTXDEN = Convert.ToByte(ee4232h.BRIIsTXDEN);
-                    eedata.CRIIsTXDEN = Convert.ToByte(ee4232h.CRIIsTXDEN);
-                    eedata.DRIIsTXDEN = Convert.ToByte(ee4232h.DRIIsTXDEN);
-                    eedata.AIsVCP8 = Convert.ToByte(ee4232h.AIsVCP);
-                    eedata.BIsVCP8 = Convert.ToByte(ee4232h.BIsVCP);
-                    eedata.CIsVCP8 = Convert.ToByte(ee4232h.CIsVCP);
-                    eedata.DIsVCP8 = Convert.ToByte(ee4232h.DIsVCP);
+                        // Map non-string elements to structure
+                        // Standard elements
+                        eedata.VendorID = ee4232h.VendorID;
+                        eedata.ProductID = ee4232h.ProductID;
+                        eedata.MaxPower = ee4232h.MaxPower;
+                        eedata.SelfPowered = Convert.ToUInt16(ee4232h.SelfPowered);
+                        eedata.RemoteWakeup = Convert.ToUInt16(ee4232h.RemoteWakeup);
+                        // 4232H specific fields
+                        eedata.PullDownEnable8 = Convert.ToByte(ee4232h.PullDownEnable);
+                        eedata.SerNumEnable8 = Convert.ToByte(ee4232h.SerNumEnable);
+                        eedata.ASlowSlew = Convert.ToByte(ee4232h.ASlowSlew);
+                        eedata.ASchmittInput = Convert.ToByte(ee4232h.ASchmittInput);
+                        eedata.ADriveCurrent = ee4232h.ADriveCurrent;
+                        eedata.BSlowSlew = Convert.ToByte(ee4232h.BSlowSlew);
+                        eedata.BSchmittInput = Convert.ToByte(ee4232h.BSchmittInput);
+                        eedata.BDriveCurrent = ee4232h.BDriveCurrent;
+                        eedata.CSlowSlew = Convert.ToByte(ee4232h.CSlowSlew);
+                        eedata.CSchmittInput = Convert.ToByte(ee4232h.CSchmittInput);
+                        eedata.CDriveCurrent = ee4232h.CDriveCurrent;
+                        eedata.DSlowSlew = Convert.ToByte(ee4232h.DSlowSlew);
+                        eedata.DSchmittInput = Convert.ToByte(ee4232h.DSchmittInput);
+                        eedata.DDriveCurrent = ee4232h.DDriveCurrent;
+                        eedata.ARIIsTXDEN = Convert.ToByte(ee4232h.ARIIsTXDEN);
+                        eedata.BRIIsTXDEN = Convert.ToByte(ee4232h.BRIIsTXDEN);
+                        eedata.CRIIsTXDEN = Convert.ToByte(ee4232h.CRIIsTXDEN);
+                        eedata.DRIIsTXDEN = Convert.ToByte(ee4232h.DRIIsTXDEN);
+                        eedata.AIsVCP8 = Convert.ToByte(ee4232h.AIsVCP);
+                        eedata.BIsVCP8 = Convert.ToByte(ee4232h.BIsVCP);
+                        eedata.CIsVCP8 = Convert.ToByte(ee4232h.CIsVCP);
+                        eedata.DIsVCP8 = Convert.ToByte(ee4232h.DIsVCP);
 
-                    // Call FT_EE_Program
-                    ftStatus = FT_EE_Program(ftHandle, eedata);
-
-                    // Free unmanaged buffers
-                    Marshal.FreeHGlobal(eedata.Manufacturer);
-                    Marshal.FreeHGlobal(eedata.ManufacturerID);
-                    Marshal.FreeHGlobal(eedata.Description);
-                    Marshal.FreeHGlobal(eedata.SerialNumber);
+                        // Call FT_EE_Program
+                        ftStatus = FT_EE_Program(ftHandle, eedata);
+                    }
+                    finally
+                    {
+                        // Free unmanaged buffers
+                        Marshal.FreeHGlobal(eedata.Manufacturer);
+                        Marshal.FreeHGlobal(eedata.ManufacturerID);
+                        Marshal.FreeHGlobal(eedata.Description);
+                        Marshal.FreeHGlobal(eedata.SerialNumber);
+                    }
                 }
             }
             else
@@ -4820,19 +5936,23 @@ namespace FTD2XX_NET
         /// <param name="ee232h">The EEPROM settings to be written to the device</param>
         /// <remarks>If the strings are too long, they will be truncated to their maximum permitted lengths</remarks>
         /// <exception cref="FT_EXCEPTION">Thrown when the current device does not match the type required by this method.</exception>
-        public FT_STATUS WriteFT232HEEPROM(FT232H_EEPROM_STRUCTURE ee232h)
-        {
+	        public FT_STATUS WriteFT232HEEPROM(FT232H_EEPROM_STRUCTURE ee232h)
+	        {
             // Initialise ftStatus to something other than FT_OK
             FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
             FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
 
-            // If the DLL hasn't been loaded, just return here
-            if (hFTD2XXDLL == IntPtr.Zero)
+            // Validate parameter
+            if (ee232h == null)
                 return ftStatus;
 
-            // Check for our required function pointers being set up
-            if (pFT_EE_Program != IntPtr.Zero)
-            {
+	            // If the DLL hasn't been loaded, just return here
+	            if (hFTD2XXDLL == IntPtr.Zero)
+	                return ftStatus;
+
+	            // Check for our required function pointers being set up
+	            if (pFT_EE_Program != IntPtr.Zero)
+	            {
                 tFT_EE_Program FT_EE_Program = (tFT_EE_Program)Marshal.GetDelegateForFunctionPointer(pFT_EE_Program, typeof(tFT_EE_Program));
 
                 if (ftHandle != IntPtr.Zero)
@@ -4841,11 +5961,11 @@ namespace FTD2XX_NET
                     // Check that it is an FT232H that we are trying to write
                     GetDeviceType(ref DeviceType);
                     if (DeviceType != FT_DEVICE.FT_DEVICE_232H)
-                    {
-                        // If it is not, throw an exception
-                        ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
-                        ErrorHandler(ftStatus, ftErrorCondition);
-                    }
+	                    {
+	                        // If it is not, throw an exception
+	                        ftErrorCondition = FT_ERROR.FT_INCORRECT_DEVICE;
+	                        ErrorHandler(ftStatus, ftErrorCondition);
+	                    }
 
                     // Check for VID and PID of 0x0000
                     if ((ee232h.VendorID == 0x0000) | (ee232h.ProductID == 0x0000))
@@ -4867,67 +5987,72 @@ namespace FTD2XX_NET
                     eedata.Description = Marshal.AllocHGlobal(64);
                     eedata.SerialNumber = Marshal.AllocHGlobal(16);
 
-                    // Check lengths of strings to make sure that they are within our limits
-                    // If not, trim them to make them our maximum length
-                    if (ee232h.Manufacturer.Length > 32)
-                        ee232h.Manufacturer = ee232h.Manufacturer.Substring(0, 32);
-                    if (ee232h.ManufacturerID.Length > 16)
-                        ee232h.ManufacturerID = ee232h.ManufacturerID.Substring(0, 16);
-                    if (ee232h.Description.Length > 64)
-                        ee232h.Description = ee232h.Description.Substring(0, 64);
-                    if (ee232h.SerialNumber.Length > 16)
-                        ee232h.SerialNumber = ee232h.SerialNumber.Substring(0, 16);
+                    try
+                    {
+                        // Check lengths of strings to make sure that they are within our limits
+                        // If not, trim them to make them our maximum length
+                        if (ee232h.Manufacturer.Length > 32)
+                            ee232h.Manufacturer = ee232h.Manufacturer.Substring(0, 32);
+                        if (ee232h.ManufacturerID.Length > 16)
+                            ee232h.ManufacturerID = ee232h.ManufacturerID.Substring(0, 16);
+                        if (ee232h.Description.Length > 64)
+                            ee232h.Description = ee232h.Description.Substring(0, 64);
+                        if (ee232h.SerialNumber.Length > 16)
+                            ee232h.SerialNumber = ee232h.SerialNumber.Substring(0, 16);
 
-                    // Set string values
-                    eedata.Manufacturer = Marshal.StringToHGlobalAnsi(ee232h.Manufacturer);
-                    eedata.ManufacturerID = Marshal.StringToHGlobalAnsi(ee232h.ManufacturerID);
-                    eedata.Description = Marshal.StringToHGlobalAnsi(ee232h.Description);
-                    eedata.SerialNumber = Marshal.StringToHGlobalAnsi(ee232h.SerialNumber);
+                        // Set string values
+                        eedata.Manufacturer = Marshal.StringToHGlobalAnsi(ee232h.Manufacturer);
+                        eedata.ManufacturerID = Marshal.StringToHGlobalAnsi(ee232h.ManufacturerID);
+                        eedata.Description = Marshal.StringToHGlobalAnsi(ee232h.Description);
+                        eedata.SerialNumber = Marshal.StringToHGlobalAnsi(ee232h.SerialNumber);
 
-                    // Map non-string elements to structure
-                    // Standard elements
-                    eedata.VendorID = ee232h.VendorID;
-                    eedata.ProductID = ee232h.ProductID;
-                    eedata.MaxPower = ee232h.MaxPower;
-                    eedata.SelfPowered = Convert.ToUInt16(ee232h.SelfPowered);
-                    eedata.RemoteWakeup = Convert.ToUInt16(ee232h.RemoteWakeup);
-                    // 232H specific fields
-                    eedata.PullDownEnableH = Convert.ToByte(ee232h.PullDownEnable);
-                    eedata.SerNumEnableH = Convert.ToByte(ee232h.SerNumEnable);
-                    eedata.ACSlowSlewH = Convert.ToByte(ee232h.ACSlowSlew);
-                    eedata.ACSchmittInputH = Convert.ToByte(ee232h.ACSchmittInput);
-                    eedata.ACDriveCurrentH = Convert.ToByte(ee232h.ACDriveCurrent);
-                    eedata.ADSlowSlewH = Convert.ToByte(ee232h.ADSlowSlew);
-                    eedata.ADSchmittInputH = Convert.ToByte(ee232h.ADSchmittInput);
-                    eedata.ADDriveCurrentH = Convert.ToByte(ee232h.ADDriveCurrent);
-                    eedata.Cbus0H = Convert.ToByte(ee232h.Cbus0);
-                    eedata.Cbus1H = Convert.ToByte(ee232h.Cbus1);
-                    eedata.Cbus2H = Convert.ToByte(ee232h.Cbus2);
-                    eedata.Cbus3H = Convert.ToByte(ee232h.Cbus3);
-                    eedata.Cbus4H = Convert.ToByte(ee232h.Cbus4);
-                    eedata.Cbus5H = Convert.ToByte(ee232h.Cbus5);
-                    eedata.Cbus6H = Convert.ToByte(ee232h.Cbus6);
-                    eedata.Cbus7H = Convert.ToByte(ee232h.Cbus7);
-                    eedata.Cbus8H = Convert.ToByte(ee232h.Cbus8);
-                    eedata.Cbus9H = Convert.ToByte(ee232h.Cbus9);
-                    eedata.IsFifoH = Convert.ToByte(ee232h.IsFifo);
-                    eedata.IsFifoTarH = Convert.ToByte(ee232h.IsFifoTar);
-                    eedata.IsFastSerH = Convert.ToByte(ee232h.IsFastSer);
-                    eedata.IsFT1248H = Convert.ToByte(ee232h.IsFT1248);
-                    eedata.FT1248CpolH = Convert.ToByte(ee232h.FT1248Cpol);
-                    eedata.FT1248LsbH = Convert.ToByte(ee232h.FT1248Lsb);
-                    eedata.FT1248FlowControlH = Convert.ToByte(ee232h.FT1248FlowControl);
-                    eedata.IsVCPH = Convert.ToByte(ee232h.IsVCP);
-                    eedata.PowerSaveEnableH = Convert.ToByte(ee232h.PowerSaveEnable);
+                        // Map non-string elements to structure
+                        // Standard elements
+                        eedata.VendorID = ee232h.VendorID;
+                        eedata.ProductID = ee232h.ProductID;
+                        eedata.MaxPower = ee232h.MaxPower;
+                        eedata.SelfPowered = Convert.ToUInt16(ee232h.SelfPowered);
+                        eedata.RemoteWakeup = Convert.ToUInt16(ee232h.RemoteWakeup);
+                        // 232H specific fields
+                        eedata.PullDownEnableH = Convert.ToByte(ee232h.PullDownEnable);
+                        eedata.SerNumEnableH = Convert.ToByte(ee232h.SerNumEnable);
+                        eedata.ACSlowSlewH = Convert.ToByte(ee232h.ACSlowSlew);
+                        eedata.ACSchmittInputH = Convert.ToByte(ee232h.ACSchmittInput);
+                        eedata.ACDriveCurrentH = Convert.ToByte(ee232h.ACDriveCurrent);
+                        eedata.ADSlowSlewH = Convert.ToByte(ee232h.ADSlowSlew);
+                        eedata.ADSchmittInputH = Convert.ToByte(ee232h.ADSchmittInput);
+                        eedata.ADDriveCurrentH = Convert.ToByte(ee232h.ADDriveCurrent);
+                        eedata.Cbus0H = Convert.ToByte(ee232h.Cbus0);
+                        eedata.Cbus1H = Convert.ToByte(ee232h.Cbus1);
+                        eedata.Cbus2H = Convert.ToByte(ee232h.Cbus2);
+                        eedata.Cbus3H = Convert.ToByte(ee232h.Cbus3);
+                        eedata.Cbus4H = Convert.ToByte(ee232h.Cbus4);
+                        eedata.Cbus5H = Convert.ToByte(ee232h.Cbus5);
+                        eedata.Cbus6H = Convert.ToByte(ee232h.Cbus6);
+                        eedata.Cbus7H = Convert.ToByte(ee232h.Cbus7);
+                        eedata.Cbus8H = Convert.ToByte(ee232h.Cbus8);
+                        eedata.Cbus9H = Convert.ToByte(ee232h.Cbus9);
+                        eedata.IsFifoH = Convert.ToByte(ee232h.IsFifo);
+                        eedata.IsFifoTarH = Convert.ToByte(ee232h.IsFifoTar);
+                        eedata.IsFastSerH = Convert.ToByte(ee232h.IsFastSer);
+                        eedata.IsFT1248H = Convert.ToByte(ee232h.IsFT1248);
+                        eedata.FT1248CpolH = Convert.ToByte(ee232h.FT1248Cpol);
+                        eedata.FT1248LsbH = Convert.ToByte(ee232h.FT1248Lsb);
+                        eedata.FT1248FlowControlH = Convert.ToByte(ee232h.FT1248FlowControl);
+                        eedata.IsVCPH = Convert.ToByte(ee232h.IsVCP);
+                        eedata.PowerSaveEnableH = Convert.ToByte(ee232h.PowerSaveEnable);
 
-                    // Call FT_EE_Program
-                    ftStatus = FT_EE_Program(ftHandle, eedata);
-
-                    // Free unmanaged buffers
-                    Marshal.FreeHGlobal(eedata.Manufacturer);
-                    Marshal.FreeHGlobal(eedata.ManufacturerID);
-                    Marshal.FreeHGlobal(eedata.Description);
-                    Marshal.FreeHGlobal(eedata.SerialNumber);
+                        // Call FT_EE_Program
+                        ftStatus = FT_EE_Program(ftHandle, eedata);
+                    }
+                    finally
+                    {
+                        // Free unmanaged buffers
+                        Marshal.FreeHGlobal(eedata.Manufacturer);
+                        Marshal.FreeHGlobal(eedata.ManufacturerID);
+                        Marshal.FreeHGlobal(eedata.Description);
+                        Marshal.FreeHGlobal(eedata.SerialNumber);
+                    }
                 }
             }
             else
@@ -4958,6 +6083,10 @@ namespace FTD2XX_NET
             FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
             FT_ERROR ftErrorCondition = FT_ERROR.FT_NO_ERROR;
 
+            // Validate parameter
+            if (eeX == null)
+                return ftStatus;
+
             byte[] manufacturer, manufacturerID, description, serialNumber;
 
             // If the DLL hasn't been loaded, just return here
@@ -4965,7 +6094,7 @@ namespace FTD2XX_NET
                 return ftStatus;
 
             // Check for our required function pointers being set up
-            if (pFT_EEPROM_Program != IntPtr.Zero) 
+            if (pFT_EEPROM_Program != IntPtr.Zero)
             {
                 tFT_EEPROM_Program FT_EEPROM_Program = (tFT_EEPROM_Program)Marshal.GetDelegateForFunctionPointer(pFT_EEPROM_Program, typeof(tFT_EEPROM_Program));
 
@@ -5072,9 +6201,18 @@ namespace FTD2XX_NET
                     int size = Marshal.SizeOf(eeData);
                     // Allocate space for our pointer...
                     IntPtr eeDataMarshal = Marshal.AllocHGlobal(size);
-                    Marshal.StructureToPtr(eeData, eeDataMarshal, false);
 
-                    ftStatus = FT_EEPROM_Program(ftHandle, eeDataMarshal, (uint)size, manufacturer, manufacturerID, description, serialNumber);
+                    try
+                    {
+                        Marshal.StructureToPtr(eeData, eeDataMarshal, false);
+
+                        ftStatus = FT_EEPROM_Program(ftHandle, eeDataMarshal, (uint)size, manufacturer, manufacturerID, description, serialNumber);
+                    }
+                    finally
+                    {
+                        // Free unmanaged buffer
+                        Marshal.FreeHGlobal(eeDataMarshal);
+                    }
                 }
             }
 
@@ -5232,7 +6370,7 @@ namespace FTD2XX_NET
             }
             return ftStatus;
         }
-        
+
         //**************************************************************************
         // GetDeviceID
         //**************************************************************************
@@ -5898,7 +7036,7 @@ namespace FTD2XX_NET
             }
             return ftStatus;
         }
-        
+
         //**************************************************************************
         // SetResetPipeRetryCount
         //**************************************************************************
