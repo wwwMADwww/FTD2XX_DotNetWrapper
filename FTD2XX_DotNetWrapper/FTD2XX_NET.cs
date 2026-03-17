@@ -27,29 +27,14 @@ using System.Text;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.IO;
-using FTD2XX_NET.Platform;
-using OperatingSystem = FTD2XX_NET.Platform.OperatingSystem;
-using System.Runtime.CompilerServices;
 
 namespace FTD2XX_NET
 {
     /// <summary>
     /// Class wrapper for FTD2XX.DLL
     /// </summary>
-    public class FTDI: IDisposable
+    public partial class FTDI
     {
-
-        const string _libpathWindows = "FTD2XX.DLL";
-
-        // path suggested by official FTDI linux installation guide
-        const string _libpathLinux = "/usr/local/lib/libftd2xx.so";
-
-
-        IPlatformFuncs _platformFuncs;
-        string _libpath;
-
-
-
         #region CONSTRUCTOR_DESTRUCTOR
         // constructor
         /// <summary>
@@ -57,132 +42,76 @@ namespace FTD2XX_NET
         /// </summary>
         public FTDI()
         {
-            _libpath = GetLibraryPath();
             Init();
         }
 
         /// <summary>
         /// Non default constructor allowing passing of string for dll handle.
         /// </summary>
-        public FTDI(String libpath)
+        public FTDI(String path)
         {
-            _libpath = libpath;
-            Init();
-        }
-
-        void Init()
-        {
-            InitPlatformFuncs();
-
-            if (hFTD2XXDLL == IntPtr.Zero)
-            {
-                // Load our library
-                hFTD2XXDLL = _platformFuncs.LoadLibrary(_libpath);
-                if (hFTD2XXDLL == IntPtr.Zero)
-                {
-                    var libfilename = Path.GetFileName(_libpath);
-                    var assemblyDir = Path.GetDirectoryName(GetType().Assembly.Location);
-                    // Failed to load our library
-                    // Give up :(
-                    Console.WriteLine($"Attempting to load {libfilename} from:\n" + assemblyDir);
-                    hFTD2XXDLL = _platformFuncs.LoadLibrary(Path.Combine(assemblyDir, libfilename));
-                }
-            }
-
-            // If we have succesfully loaded the library, get the function pointers set up
-            if (hFTD2XXDLL != IntPtr.Zero)
-            {
-                FindFunctionPointers();
-            }
-            else
-            {
-                Console.WriteLine("Failed to load FTD2XX library. Are the FTDI drivers installed?");
-            }
-        }
-
-        void InitPlatformFuncs()
-        {
-            if (_platformFuncs == null)
-                _platformFuncs = new PlatformFuncs();
-        }
-
-        private string GetLibraryPath()
-        {
-            InitPlatformFuncs();
-            switch (_platformFuncs.OperatingSystem)
-            {
-                case OperatingSystem.Windows:
-                    return _libpathWindows;
-
-                case OperatingSystem.Linux:
-                    return _libpathLinux;
-
-                case OperatingSystem.OSX:
-                    throw new NotImplementedException();
-
-                default:
-                    throw new NotSupportedException("Unknown OS");
-            }
+            Init(path);
         }
 
         private void FindFunctionPointers()
         {
             // Set up our function pointers for use through our exported methods
-            pFT_CreateDeviceInfoList = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_CreateDeviceInfoList");
-            pFT_GetDeviceInfoDetail = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_GetDeviceInfoDetail");
-            pFT_Open = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_Open");
-            pFT_OpenEx = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_OpenEx");
-            pFT_Close = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_Close");
-            pFT_Read = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_Read");
-            pFT_Write = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_Write");
-            pFT_WriteBufPtr = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_Write");
-            pFT_GetQueueStatus = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_GetQueueStatus");
-            pFT_GetModemStatus = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_GetModemStatus");
-            pFT_GetStatus = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_GetStatus");
-            pFT_SetBaudRate = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_SetBaudRate");
-            pFT_SetDataCharacteristics = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_SetDataCharacteristics");
-            pFT_SetFlowControl = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_SetFlowControl");
-            pFT_SetDtr = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_SetDtr");
-            pFT_ClrDtr = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_ClrDtr");
-            pFT_SetRts = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_SetRts");
-            pFT_ClrRts = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_ClrRts");
-            pFT_ResetDevice = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_ResetDevice");
-            pFT_ResetPort = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_ResetPort");
-            pFT_CyclePort = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_CyclePort");
-            pFT_Rescan = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_Rescan");
-            pFT_Reload = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_Reload");
-            pFT_Purge = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_Purge");
-            pFT_SetTimeouts = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_SetTimeouts");
-            pFT_SetBreakOn = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_SetBreakOn");
-            pFT_SetBreakOff = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_SetBreakOff");
-            pFT_GetDeviceInfo = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_GetDeviceInfo");
-            pFT_SetResetPipeRetryCount = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_SetResetPipeRetryCount");
-            pFT_StopInTask = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_StopInTask");
-            pFT_RestartInTask = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_RestartInTask");
-            pFT_GetDriverVersion = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_GetDriverVersion");
-            pFT_GetLibraryVersion = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_GetLibraryVersion");
-            pFT_SetDeadmanTimeout = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_SetDeadmanTimeout");
-            pFT_SetChars = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_SetChars");
-            pFT_SetEventNotification = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_SetEventNotification");
-            pFT_GetComPortNumber = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_GetComPortNumber");
-            pFT_SetLatencyTimer = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_SetLatencyTimer");
-            pFT_GetLatencyTimer = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_GetLatencyTimer");
-            pFT_SetBitMode = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_SetBitMode");
-            pFT_GetBitMode = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_GetBitMode");
-            pFT_SetUSBParameters = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_SetUSBParameters");
-            pFT_ReadEE = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_ReadEE");
-            pFT_WriteEE = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_WriteEE");
-            pFT_EraseEE = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_EraseEE");
-            pFT_EE_UASize = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_EE_UASize");
-            pFT_EE_UARead = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_EE_UARead");
-            pFT_EE_UAWrite = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_EE_UAWrite");
-            pFT_EE_Read = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_EE_Read");
-            pFT_EE_Program = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_EE_Program");
-            pFT_EEPROM_Read = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_EEPROM_Read");
-            pFT_EEPROM_Program = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_EEPROM_Program");
-            pFT_VendorCmdGet = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_VendorCmdGet");
-            pFT_VendorCmdSet = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_VendorCmdSet");
-            pFT_VendorCmdSetX = _platformFuncs.GetSymbol(hFTD2XXDLL, "FT_VendorCmdSetX");
+            pFT_CreateDeviceInfoList = GetProcAddress(hFTD2XXDLL, "FT_CreateDeviceInfoList");
+            pFT_GetDeviceInfoDetail = GetProcAddress(hFTD2XXDLL, "FT_GetDeviceInfoDetail");
+            pFT_Open = GetProcAddress(hFTD2XXDLL, "FT_Open");
+            pFT_OpenEx = GetProcAddress(hFTD2XXDLL, "FT_OpenEx");
+            pFT_Close = GetProcAddress(hFTD2XXDLL, "FT_Close");
+            pFT_Read = GetProcAddress(hFTD2XXDLL, "FT_Read");
+            pFT_Write = GetProcAddress(hFTD2XXDLL, "FT_Write");
+            pFT_GetQueueStatus = GetProcAddress(hFTD2XXDLL, "FT_GetQueueStatus");
+            pFT_GetModemStatus = GetProcAddress(hFTD2XXDLL, "FT_GetModemStatus");
+            pFT_GetStatus = GetProcAddress(hFTD2XXDLL, "FT_GetStatus");
+            pFT_SetBaudRate = GetProcAddress(hFTD2XXDLL, "FT_SetBaudRate");
+            pFT_SetDataCharacteristics = GetProcAddress(hFTD2XXDLL, "FT_SetDataCharacteristics");
+            pFT_SetFlowControl = GetProcAddress(hFTD2XXDLL, "FT_SetFlowControl");
+            pFT_SetDtr = GetProcAddress(hFTD2XXDLL, "FT_SetDtr");
+            pFT_ClrDtr = GetProcAddress(hFTD2XXDLL, "FT_ClrDtr");
+            pFT_SetRts = GetProcAddress(hFTD2XXDLL, "FT_SetRts");
+            pFT_ClrRts = GetProcAddress(hFTD2XXDLL, "FT_ClrRts");
+            pFT_ResetDevice = GetProcAddress(hFTD2XXDLL, "FT_ResetDevice");
+            pFT_ResetPort = GetProcAddress(hFTD2XXDLL, "FT_ResetPort");
+            pFT_CyclePort = GetProcAddress(hFTD2XXDLL, "FT_CyclePort");
+            pFT_Rescan = GetProcAddress(hFTD2XXDLL, "FT_Rescan");
+            pFT_Reload = GetProcAddress(hFTD2XXDLL, "FT_Reload");
+            pFT_Purge = GetProcAddress(hFTD2XXDLL, "FT_Purge");
+            pFT_SetTimeouts = GetProcAddress(hFTD2XXDLL, "FT_SetTimeouts");
+            pFT_SetBreakOn = GetProcAddress(hFTD2XXDLL, "FT_SetBreakOn");
+            pFT_SetBreakOff = GetProcAddress(hFTD2XXDLL, "FT_SetBreakOff");
+            pFT_GetDeviceInfo = GetProcAddress(hFTD2XXDLL, "FT_GetDeviceInfo");
+            pFT_SetResetPipeRetryCount = GetProcAddress(hFTD2XXDLL, "FT_SetResetPipeRetryCount");
+            pFT_StopInTask = GetProcAddress(hFTD2XXDLL, "FT_StopInTask");
+            pFT_RestartInTask = GetProcAddress(hFTD2XXDLL, "FT_RestartInTask");
+            pFT_GetDriverVersion = GetProcAddress(hFTD2XXDLL, "FT_GetDriverVersion");
+            pFT_GetLibraryVersion = GetProcAddress(hFTD2XXDLL, "FT_GetLibraryVersion");
+            pFT_SetDeadmanTimeout = GetProcAddress(hFTD2XXDLL, "FT_SetDeadmanTimeout");
+            pFT_SetChars = GetProcAddress(hFTD2XXDLL, "FT_SetChars");
+            pFT_SetEventNotification = GetProcAddress(hFTD2XXDLL, "FT_SetEventNotification");
+            pFT_GetComPortNumber = GetProcAddress(hFTD2XXDLL, "FT_GetComPortNumber");
+            pFT_SetLatencyTimer = GetProcAddress(hFTD2XXDLL, "FT_SetLatencyTimer");
+            pFT_GetLatencyTimer = GetProcAddress(hFTD2XXDLL, "FT_GetLatencyTimer");
+            pFT_SetBitMode = GetProcAddress(hFTD2XXDLL, "FT_SetBitMode");
+            pFT_GetBitMode = GetProcAddress(hFTD2XXDLL, "FT_GetBitMode");
+            pFT_SetUSBParameters = GetProcAddress(hFTD2XXDLL, "FT_SetUSBParameters");
+            pFT_ReadEE = GetProcAddress(hFTD2XXDLL, "FT_ReadEE");
+            pFT_WriteEE = GetProcAddress(hFTD2XXDLL, "FT_WriteEE");
+            pFT_EraseEE = GetProcAddress(hFTD2XXDLL, "FT_EraseEE");
+            pFT_EE_UASize = GetProcAddress(hFTD2XXDLL, "FT_EE_UASize");
+            pFT_EE_UARead = GetProcAddress(hFTD2XXDLL, "FT_EE_UARead");
+            pFT_EE_UAWrite = GetProcAddress(hFTD2XXDLL, "FT_EE_UAWrite");
+            pFT_EE_Read = GetProcAddress(hFTD2XXDLL, "FT_EE_Read");
+            pFT_EE_Program = GetProcAddress(hFTD2XXDLL, "FT_EE_Program");
+            pFT_EEPROM_Read = GetProcAddress(hFTD2XXDLL, "FT_EEPROM_Read");
+            pFT_EEPROM_Program = GetProcAddress(hFTD2XXDLL, "FT_EEPROM_Program");
+            pFT_VendorCmdGet = GetProcAddress(hFTD2XXDLL, "FT_VendorCmdGet");
+            pFT_VendorCmdSet = GetProcAddress(hFTD2XXDLL, "FT_VendorCmdSet");
+            pFT_VendorCmdSetX = GetProcAddress(hFTD2XXDLL, "FT_VendorCmdSetX");
+
+            FindFunctionPointersExtend();
         }
 
         /// <summary>
@@ -190,9 +119,7 @@ namespace FTD2XX_NET
         /// </summary>
         ~FTDI()
         {
-            // FreeLibrary here - we should only do this if we are completely finished
-            _platformFuncs.FreeLibrary(hFTD2XXDLL);
-            hFTD2XXDLL = IntPtr.Zero;
+            Dispose(false);
         }
         #endregion
 
@@ -214,11 +141,8 @@ namespace FTD2XX_NET
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate FT_STATUS tFT_Read(IntPtr ftHandle, byte[] lpBuffer, UInt32 dwBytesToRead, ref UInt32 lpdwBytesReturned);
-
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate FT_STATUS tFT_Write(IntPtr ftHandle, byte[] lpBuffer, UInt32 dwBytesToWrite, ref UInt32 lpdwBytesWritten);
-        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        private delegate FT_STATUS tFT_WriteBufPtr(IntPtr ftHandle, in byte lpBuffer, UInt32 dwBytesToWrite, ref UInt32 lpdwBytesWritten);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate FT_STATUS tFT_GetQueueStatus(IntPtr ftHandle, ref UInt32 lpdwAmountInRxQueue);
@@ -2064,7 +1988,7 @@ namespace FTD2XX_NET
         #endregion
 
         #region FUNCTION_IMPORTS_FTD2XX.DLL
-        // Handle to our DLL - used with _platformFuncs.GetSymbol to load all of our functions
+        // Handle to our DLL - used with GetProcAddress to load all of our functions
         IntPtr hFTD2XXDLL = IntPtr.Zero;
         // Declare pointers to each of the functions we are going to use in FT2DXX.DLL
         // These are assigned in our constructor and freed in our destructor.
@@ -2075,7 +1999,6 @@ namespace FTD2XX_NET
         IntPtr pFT_Close = IntPtr.Zero;
         IntPtr pFT_Read = IntPtr.Zero;
         IntPtr pFT_Write = IntPtr.Zero;
-        IntPtr pFT_WriteBufPtr = IntPtr.Zero;
         IntPtr pFT_GetQueueStatus = IntPtr.Zero;
         IntPtr pFT_GetModemStatus = IntPtr.Zero;
         IntPtr pFT_GetStatus = IntPtr.Zero;
@@ -2717,103 +2640,6 @@ namespace FTD2XX_NET
             }
             return ftStatus;
         }
-
-
-        //**************************************************************************
-        // Write
-        //**************************************************************************
-        // Intellisense comments
-        /// <summary>
-        /// Write data to an open FTDI device.
-        /// </summary>
-        /// <returns>FT_STATUS value from FT_Write in FTD2XX.DLL</returns>
-        /// <param name="dataBuffer">An array of bytes which contains the data to be written to the device.</param>
-        /// <param name="offset">Buffer offset to start write data from</param>
-        /// <param name="numBytesToWrite">The number of bytes to be written to the device.</param>
-        /// <param name="numBytesWritten">The number of bytes actually written to the device.</param>
-        public FT_STATUS Write(byte[] dataBuffer, Int32 offset, Int32 numBytesToWrite, ref UInt32 numBytesWritten)
-        {
-            // Initialise ftStatus to something other than FT_OK
-            FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
-
-            // If the DLL hasn't been loaded, just return here
-            if (hFTD2XXDLL == IntPtr.Zero)
-                return ftStatus;
-
-            // Check for our required function pointers being set up
-            if (pFT_Write != IntPtr.Zero)
-            {
-                tFT_WriteBufPtr FT_WriteBufPtr = (tFT_WriteBufPtr)Marshal.GetDelegateForFunctionPointer(pFT_WriteBufPtr, typeof(tFT_WriteBufPtr));
-
-                if (ftHandle != IntPtr.Zero)
-                {
-                    unsafe
-                    {
-                        var span = dataBuffer.AsSpan(offset, numBytesToWrite);
-                        fixed (byte* ptr = span)
-                        {
-                            ftStatus = FT_WriteBufPtr(ftHandle, Unsafe.AsRef<byte>(ptr), (UInt32)numBytesToWrite, ref numBytesWritten);
-                        }
-                    }
-                }
-            }
-            else
-            {
-                if (pFT_Write == IntPtr.Zero)
-                {
-                    Console.WriteLine("Failed to load function FT_Write.");
-                }
-            }
-            return ftStatus;
-        }
-
-
-
-        //**************************************************************************
-        // Write
-        //**************************************************************************
-        // Intellisense comments
-        /// <summary>
-        /// Write data to an open FTDI device.
-        /// </summary>
-        /// <returns>FT_STATUS value from FT_Write in FTD2XX.DLL</returns>
-        /// <param name="dataBuffer">An array of bytes which contains the data to be written to the device.</param>
-        /// <param name="numBytesWritten">The number of bytes actually written to the device.</param>
-        public FT_STATUS Write(Span<byte> dataBuffer, ref UInt32 numBytesWritten)
-        {
-            // Initialise ftStatus to something other than FT_OK
-            FT_STATUS ftStatus = FT_STATUS.FT_OTHER_ERROR;
-
-            // If the DLL hasn't been loaded, just return here
-            if (hFTD2XXDLL == IntPtr.Zero)
-                return ftStatus;
-
-            // Check for our required function pointers being set up
-            if (pFT_Write != IntPtr.Zero)
-            {
-                tFT_WriteBufPtr FT_WriteBufPtr = (tFT_WriteBufPtr)Marshal.GetDelegateForFunctionPointer(pFT_WriteBufPtr, typeof(tFT_WriteBufPtr));
-
-                if (ftHandle != IntPtr.Zero)
-                {
-                    unsafe
-                    {
-                        fixed (byte* ptr = dataBuffer)
-                        {
-                            ftStatus = FT_WriteBufPtr(ftHandle, Unsafe.AsRef<byte>(ptr), (UInt32)dataBuffer.Length, ref numBytesWritten);
-                        }
-                    }
-                }
-            }
-            else
-            {
-                if (pFT_Write == IntPtr.Zero)
-                {
-                    Console.WriteLine("Failed to load function FT_Write.");
-                }
-            }
-            return ftStatus;
-        }
-
 
         // Intellisense comments
         /// <summary>
@@ -6743,48 +6569,6 @@ namespace FTD2XX_NET
             }
 
             return;
-        }
-
-        #endregion
-
-
-        #region IDisposable Support
-        private bool disposedValue = false; // To detect redundant calls
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!disposedValue)
-            {
-                if (disposing)
-                {
-                    // TODO: dispose managed state (managed objects).
-                }
-
-                // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
-                // TODO: set large fields to null.
-
-                _platformFuncs.FreeLibrary(hFTD2XXDLL);
-
-                _platformFuncs.Dispose();
-
-                disposedValue = true;
-            }
-        }
-
-        // TODO: override a finalizer only if Dispose(bool disposing) above has code to free unmanaged resources.
-        // ~FTDI()
-        // {
-        //   // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
-        //   Dispose(false);
-        // }
-
-        // This code added to correctly implement the disposable pattern.
-        public void Dispose()
-        {
-            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
-            Dispose(true);
-            // TODO: uncomment the following line if the finalizer is overridden above.
-            // GC.SuppressFinalize(this);
         }
         #endregion
     }
